@@ -1,65 +1,131 @@
-import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main style={{ minHeight: "100vh", background: "#050814", color: "white" }}>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "18px 22px",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          position: "sticky",
+          top: 0,
+          background: "rgba(5,8,20,0.85)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <img src="/logo-odontoflow.png" alt="OdontoFlow" style={{ height: 34 }} />
+          <strong style={{ letterSpacing: 0.3 }}>OdontoFlow</strong>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            href="https://wa.me/5511939479749?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20OdontoFlow"
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noreferrer"
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.18)",
+              textDecoration: "none",
+              color: "white",
+              opacity: 0.9,
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
+            Suporte WhatsApp
           </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+          <Link
+            href="/login"
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "linear-gradient(90deg, #00D4FF, #2B5BFF)",
+              color: "white",
+              textDecoration: "none",
+              fontWeight: 700,
+            }}
           >
-            Documentation
+            Entrar
+          </Link>
+        </div>
+      </header>
+
+      <section style={{ padding: "56px 22px", maxWidth: 1100, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 44, margin: 0, lineHeight: 1.1 }}>
+          Pacientes na Cadeira. Agenda Cheia.
+        </h1>
+        <p style={{ marginTop: 14, fontSize: 18, opacity: 0.86, maxWidth: 820 }}>
+          Plataforma completa para clínicas odontológicas, da pequena clínica até redes e franquias:
+          agenda, pacientes, equipe, produção, financeiro, relatórios e automações.
+        </p>
+
+        <div style={{ marginTop: 22, display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Link
+            href="/login"
+            style={{
+              padding: "12px 16px",
+              borderRadius: 12,
+              background: "white",
+              color: "#050814",
+              textDecoration: "none",
+              fontWeight: 800,
+            }}
+          >
+            Acessar sistema
+          </Link>
+
+          <a
+            href="https://wa.me/5511939479749?text=Quero%20conhecer%20o%20OdontoFlow%20e%20ver%20os%20m%C3%B3dulos"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              padding: "12px 16px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.18)",
+              color: "white",
+              textDecoration: "none",
+              fontWeight: 700,
+            }}
+          >
+            Falar no WhatsApp
           </a>
         </div>
-      </main>
-    </div>
+
+        <div
+          style={{
+            marginTop: 34,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 14,
+          }}
+        >
+          {[
+            ["Agenda & Confirmação", "Calendário, encaixes, lembretes e no-show"],
+            ["Pacientes", "Cadastro completo, histórico e documentos"],
+            ["Equipe", "Usuários, cargos, setores e permissões por clínica"],
+            ["Financeiro", "Receitas, despesas, repasses e relatórios"],
+            ["Relatórios", "Produção, crescimento, atendimentos e performance"],
+            ["Multi-clínica", "Estrutura para grupos, redes e franquias"],
+          ].map(([title, desc]) => (
+            <div
+              key={title}
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                border: "1px solid rgba(255,255,255,0.10)",
+                background: "rgba(255,255,255,0.03)",
+              }}
+            >
+              <div style={{ fontWeight: 900 }}>{title}</div>
+              <div style={{ marginTop: 6, opacity: 0.82 }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }
