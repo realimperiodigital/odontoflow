@@ -1,0 +1,23 @@
+[35mapp/components/FeatureCard.tsx[m[36m:[m[32m27[m[36m:[m            <a href="/[1;31mlogin[m" className="bg-blue-600 px-6 py-3 rounded-lg">
+[35mapp/components/Footer.tsx[m[36m:[m[32m38[m[36m:[m                        <li><a href="/[1;31mlogin[m" className="hover:text-[#18A8FF] transition-colors">Área do Cliente</a></li>
+[35mapp/components/Header.tsx[m[36m:[m[32m50[m[36m:[m                    <Link href="/[1;31mlogin[m" className="px-5 py-2 rounded-full border border-[#18A8FF]/50 text-[#18A8FF] font-semibold hover:bg-[#18A8FF]/10 transition-all text-sm">
+[35mapp/components/Header.tsx[m[36m:[m[32m84[m[36m:[m                    <Link href="/[1;31mlogin[m" className="text-center w-full py-3 rounded border border-[#18A8FF]/50 text-[#18A8FF]">
+[35mapp/dashboard/_components/TeamCard.tsx[m[36m:[m[32m87[m[36m:[m    if (!token) return alert("Sessão inválida. Faça [1;31mlogin[m novamente.");
+[35mapp/dashboard/_components/TeamCard.tsx[m[36m:[m[32m170[m[36m:[m                Envie para o usuário. Ele será obrigado a trocar no primeiro [1;31mlogin[m.
+[35mapp/dashboard/agenda/page.tsx[m[36m:[m[32m25[m[36m:[m            if (!session || !p) { router.push('/[1;31mlogin[m'); return; }
+[35mapp/dashboard/equipe/page.tsx[m[36m:[m[32m88[m[36m:[m    if (!token) return alert("Sessão inválida. Faça [1;31mlogin[m novamente.");
+[35mapp/dashboard/equipe/page.tsx[m[36m:[m[32m121[m[36m:[m        Crie usuários de recepção, financeiro e dentistas. Eles serão obrigados a trocar a senha no primeiro [1;31mlogin[m.
+[35mapp/dashboard/equipe/page.tsx[m[36m:[m[32m171[m[36m:[m                Copie e envie para o usuário. Ele vai trocar no primeiro [1;31mlogin[m.
+[35mapp/dashboard/financial/page.tsx[m[36m:[m[32m25[m[36m:[m            if (!session || !p) { router.push('/[1;31mlogin[m'); return; }
+[35mapp/dashboard/page.tsx[m[36m:[m[32m26[m[36m:[m        router.push("/[1;31mlogin[m");
+[35mapp/dashboard/page.tsx[m[36m:[m[32m90[m[36m:[m    router.push("/[1;31mlogin[m");
+[35mapp/dashboard/patients/page.tsx[m[36m:[m[32m28[m[36m:[m      if (!session || !p) { router.push('/[1;31mlogin[m'); return; }
+[35mapp/dashboard/reports/page.tsx[m[36m:[m[32m16[m[36m:[m            if (!session || !p) { router.push('/[1;31mlogin[m'); return; }
+[35mapp/dashboard/team/page.tsx[m[36m:[m[32m29[m[36m:[m            if (!session) { router.push('/[1;31mlogin[m'); return; }
+[35mapp/dashboard/team/page.tsx[m[36m:[m[32m30[m[36m:[m            if (!p) { router.push('/[1;31mlogin[m'); return; }
+[35mapp/page.tsx[m[36m:[m[32m44[m[36m:[m              href="/[1;31mlogin[m"
+[35mapp/page.tsx[m[36m:[m[32m83[m[36m:[m                href="/[1;31mlogin[m"
+[35mapp/page.tsx[m[36m:[m[32m218[m[36m:[m              href="/[1;31mlogin[m"
+[35mapp/suporte/page.tsx[m[36m:[m[32m9[m[36m:[m        a: "Na tela de [1;31mlogin[m, clique em 'Esqueci minha senha'. Você receberá um e-mail com instruções para redefinição. Se for seu primeiro acesso, use a senha temporária enviada pelo administrador."
+[35modontoflow/src/app/page.tsx[m[36m:[m[32m33[m[36m:[m            href="/[1;31mlogin[m"
+[35modontoflow/src/app/page.tsx[m[36m:[m[32m59[m[36m:[m              href="/[1;31mlogin[m"
