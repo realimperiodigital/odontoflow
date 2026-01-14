@@ -1,7 +1,34 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useMemo, useState } from "react";
+
+type DemoVideo = { title: string; src: string };
 
 export default function HomePage() {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState<DemoVideo | null>(null);
+
+  const videos: DemoVideo[] = useMemo(
+    () => [
+      { title: "Visão geral do sistema", src: "/media/system.mp4" },
+      { title: "Rotina da clínica", src: "/media/clinic.mp4" },
+      { title: "Financeiro", src: "/media/finance.mp4" },
+    ],
+    []
+  );
+
+  function openVideo(v: DemoVideo) {
+    setActive(v);
+    setOpen(true);
+  }
+
+  function closeVideo() {
+    setOpen(false);
+    setActive(null);
+  }
+
   return (
     <main className="min-h-screen bg-[#05060a] text-white">
       {/* TOP BAR */}
@@ -24,6 +51,9 @@ export default function HomePage() {
             <a href="#videos" className="text-sm text-white/70 hover:text-white">
               Vídeos
             </a>
+            <Link href="/treinamento" className="text-sm text-white/70 hover:text-white">
+              Treinamento
+            </Link>
             <a
               href="https://wa.me/5511939479749"
               target="_blank"
@@ -75,8 +105,8 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-5 text-base text-white/75 md:text-lg">
-              Plataforma completa para clínicas odontológicas: agenda, pacientes, equipe,
-              financeiro, relatórios e automatizações — tudo no mesmo lugar.
+              Plataforma completa para clínicas odontológicas: agenda, pacientes, equipe, financeiro,
+              relatórios e automatizações — tudo no mesmo lugar.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -96,19 +126,27 @@ export default function HomePage() {
                 Falar no WhatsApp
               </a>
 
-              <a
-                href="#videos"
+              <Link
+                href="/treinamento"
                 className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold hover:bg-white/10"
               >
-                Ver demonstração
-              </a>
+                Treinamento rápido (3 min)
+              </Link>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/70">
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">✅ Multiclínicas</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">✅ Redução de faltas</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">✅ Permissões por equipe</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">✅ Relatórios & financeiro</span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                ✅ Multiclínicas
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                ✅ Redução de faltas
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                ✅ Permissões por equipe
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                ✅ Relatórios & financeiro
+              </span>
             </div>
           </div>
         </div>
@@ -208,17 +246,71 @@ export default function HomePage() {
 
       {/* VÍDEOS */}
       <section id="videos" className="mx-auto max-w-6xl px-6 pb-24">
-        <h2 className="text-2xl font-bold md:text-3xl">Demonstrações em vídeo</h2>
-        <p className="mt-2 max-w-2xl text-sm text-white/70 md:text-base">
-          Seus vídeos já estão no projeto. O que faltava era o site apontar pro caminho certo.
-        </p>
+        <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
+          <div>
+            <h2 className="text-2xl font-bold md:text-3xl">Demonstrações em vídeo</h2>
+            <p className="mt-2 max-w-2xl text-sm text-white/70 md:text-base">
+              Aqui os vídeos ficam “clean” (sem tempo/segundos). Se quiser ver com áudio e controles, abre no modal.
+            </p>
+          </div>
+
+          <Link
+            href="/treinamento"
+            className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm font-semibold hover:bg-white/10"
+          >
+            Ver Treinamento rápido
+          </Link>
+        </div>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <VideoCard title="Visão geral do sistema" src="/media/system.mp4" />
-          <VideoCard title="Rotina da clínica" src="/media/clinic.mp4" />
-          <VideoCard title="Financeiro" src="/media/finance.mp4" />
+          {videos.map((v) => (
+            <VideoCard key={v.src} title={v.title} src={v.src} onOpen={() => openVideo(v)} />
+          ))}
         </div>
       </section>
+
+      {/* MODAL */}
+      {open && active && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 p-4"
+          onClick={closeVideo}
+        >
+          <div
+            className="w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-[#05060a]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+              <div className="text-sm font-semibold">{active.title}</div>
+              <button
+                onClick={closeVideo}
+                className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 hover:bg-white/10"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="overflow-hidden rounded-xl border border-white/10">
+                <video className="h-auto w-full" src={active.src} controls playsInline preload="metadata" />
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs text-white/60">
+                  Dica: aqui é o modo “com áudio/controles”. Na home, os vídeos ficam clean pra vender.
+                </div>
+                <a
+                  href="https://wa.me/5511939479749"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center rounded-full bg-[#2f6bff] px-5 py-2 text-xs font-semibold hover:brightness-110"
+                >
+                  Quero uma demonstração no WhatsApp
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FLOATING WHATS */}
       <a
@@ -233,18 +325,34 @@ export default function HomePage() {
   );
 }
 
-function VideoCard({ title, src }: { title: string; src: string }) {
+function VideoCard({ title, src, onOpen }: { title: string; src: string; onOpen: () => void }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-      <div className="text-sm font-semibold">{title}</div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold">{title}</div>
+        <button
+          onClick={onOpen}
+          className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold hover:bg-white/10"
+        >
+          Ver com áudio
+        </button>
+      </div>
+
       <div className="mt-4 overflow-hidden rounded-xl border border-white/10">
+        {/* SEM CONTROLS = SEM SEGUNDOS */}
         <video
           className="h-auto w-full"
           src={src}
-          controls
+          autoPlay
+          muted
+          loop
           playsInline
           preload="metadata"
         />
+      </div>
+
+      <div className="mt-3 text-xs text-white/60">
+        Vídeo em modo “demo” (sem tempo/segundos). Abra em “Ver com áudio” se quiser controles.
       </div>
     </div>
   );
