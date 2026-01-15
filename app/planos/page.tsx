@@ -1,63 +1,115 @@
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import WhatsAppCTA from "../components/WhatsAppCTA";
 
 export default function PlanosPage() {
-    return (
-        <div className="min-h-screen bg-[#060B16] text-gray-300">
-            <Header />
-            <main className="pt-24 pb-20">
-                <div className="max-w-7xl mx-auto px-6 text-center">
-                    <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">Planos que cabem no seu bolso</h1>
-                    <p className="text-xl text-[#B0B7C3] mb-16">
-                        Comece grátis. Cresça sem limites.
-                    </p>
+  return (
+    <main className="min-h-screen bg-[#05060a] text-white">
+      <Header />
 
-                    <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-                        {/* Basic */}
-                        <div className="glass-panel p-8 rounded-2xl border border-white/5 flex flex-col items-center">
-                            <h3 className="text-xl font-bold text-white mb-2">Individual</h3>
-                            <div className="text-4xl font-bold text-[#18A8FF] mb-4">R$ 97<span className="text-sm text-gray-400">/mês</span></div>
-                            <p className="text-sm text-gray-500 mb-8">Para consultórios iniciantes.</p>
-                            <ul className="space-y-4 text-left w-full text-sm mb-8 flex-grow">
-                                <li className="flex gap-2"><span>✓</span> 1 Dentista</li>
-                                <li className="flex gap-2"><span>✓</span> Agenda e Prontuário</li>
-                                <li className="flex gap-2"><span>✓</span> 500 SMS/mês</li>
-                            </ul>
-                            <button className="w-full py-3 rounded border border-[#18A8FF] text-[#18A8FF] hover:bg-[#18A8FF]/10 transition-colors font-bold">Assinar Agora</button>
-                        </div>
+      {/* HERO COM VIDEO */}
+      <section className="relative overflow-hidden">
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        >
+          <source src="/media/system.mp4" type="video/mp4" />
+        </video>
 
-                        {/* Pro */}
-                        <div className="glass-panel p-8 rounded-2xl border border-[#18A8FF] relative transform scale-105 shadow-[0_0_30px_rgba(24,168,255,0.2)]">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#18A8FF] text-white px-4 py-1 rounded-full text-xs font-bold uppercase">Mais Popular</div>
-                            <h3 className="text-xl font-bold text-white mb-2">Clínica</h3>
-                            <div className="text-4xl font-bold text-[#18A8FF] mb-4">R$ 197<span className="text-sm text-gray-400">/mês</span></div>
-                            <p className="text-sm text-gray-500 mb-8">Para clínicas em crescimento.</p>
-                            <ul className="space-y-4 text-left w-full text-sm mb-8 flex-grow text-gray-200">
-                                <li className="flex gap-2 text-[#18A8FF]"><span>✓</span> Até 5 Dentistas</li>
-                                <li className="flex gap-2 text-[#18A8FF]"><span>✓</span> Financeiro Completo</li>
-                                <li className="flex gap-2 text-[#18A8FF]"><span>✓</span> Confirmação WhatsApp</li>
-                                <li className="flex gap-2 text-[#18A8FF]"><span>✓</span> CRM de Vendas</li>
-                            </ul>
-                            <button className="w-full py-3 rounded bg-[#18A8FF] text-white hover:bg-[#0093E9] transition-colors font-bold shadow-lg">Assinar Agora</button>
-                        </div>
+        <div className="absolute inset-0 bg-black/65" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#05060a]/30 via-[#05060a]/70 to-[#05060a]" />
 
-                        {/* Enterprise */}
-                        <div className="glass-panel p-8 rounded-2xl border border-white/5 flex flex-col items-center">
-                            <h3 className="text-xl font-bold text-white mb-2">Rede / Franquia</h3>
-                            <div className="text-4xl font-bold text-white mb-4">Sob Consulta</div>
-                            <p className="text-sm text-gray-500 mb-8">Para grandes operações.</p>
-                            <ul className="space-y-4 text-left w-full text-sm mb-8 flex-grow">
-                                <li className="flex gap-2"><span>✓</span> Dentistas Ilimitados</li>
-                                <li className="flex gap-2"><span>✓</span> Gestão Multi-unidade</li>
-                                <li className="flex gap-2"><span>✓</span> API Dedicada</li>
-                                <li className="flex gap-2"><span>✓</span> Gerente de Contas</li>
-                            </ul>
-                            <button className="w-full py-3 rounded border border-white/20 text-white hover:bg-white/5 transition-colors font-bold">Falar com Consultor</button>
-                        </div>
-                    </div>
-                </div>
-            </main>
-            <Footer />
+        <div className="relative mx-auto w-full max-w-6xl px-6 pt-16 pb-20">
+          <h1 className="text-4xl md:text-5xl font-semibold leading-tight">
+            Planos do <span className="text-white/80">OdontoFlow</span>
+          </h1>
+
+          <p className="mt-4 max-w-2xl text-white/80">
+            Escolha o plano ideal para sua clínica. Se preferir, me chama no WhatsApp
+            que eu te indico o melhor e ativo o teste grátis agora.
+          </p>
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <WhatsAppCTA label="✅ Teste grátis por 7 dias" />
+            <WhatsAppCTA label="Quero ajuda para escolher" variant="ghost" />
+          </div>
         </div>
-    );
+      </section>
+
+      {/* CARDS DE PLANOS */}
+      <section className="mx-auto w-full max-w-6xl px-6 py-16">
+        <h2 className="text-2xl font-semibold">Escolha seu plano</h2>
+        <p className="mt-2 text-white/70">
+          Comece no teste grátis. Depois você decide se continua.
+        </p>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {/* START */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="text-sm text-white/60">Plano</div>
+            <div className="mt-1 text-xl font-semibold">Start</div>
+            <div className="mt-3 text-sm text-white/70">Para clínica pequena começando a organizar a rotina.</div>
+            <ul className="mt-4 space-y-2 text-sm text-white/80">
+              <li>✅ Agenda</li>
+              <li>✅ Pacientes</li>
+              <li>✅ Confirmação no WhatsApp</li>
+              <li>✅ Suporte</li>
+            </ul>
+            <div className="mt-6">
+              <WhatsAppCTA label="Ativar teste grátis" />
+            </div>
+          </div>
+
+          {/* PRO (DESTAQUE) */}
+          <div className="rounded-2xl border border-white/20 bg-white/10 p-6">
+            <div className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs text-white/80 border border-white/10">
+              Mais escolhido
+            </div>
+            <div className="mt-2 text-sm text-white/60">Plano</div>
+            <div className="mt-1 text-xl font-semibold">Pro</div>
+            <div className="mt-3 text-sm text-white/80">
+              Para clínicas que querem acelerar resultado e reduzir faltas de verdade.
+            </div>
+            <ul className="mt-4 space-y-2 text-sm text-white/90">
+              <li>✅ Tudo do Start</li>
+              <li>✅ Relatórios</li>
+              <li>✅ Usuários e permissões</li>
+              <li>✅ Rotina da recepção</li>
+            </ul>
+            <div className="mt-6">
+              <WhatsAppCTA label="Ativar teste grátis" />
+            </div>
+          </div>
+
+          {/* PREMIUM */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="text-sm text-white/60">Plano</div>
+            <div className="mt-1 text-xl font-semibold">Premium</div>
+            <div className="mt-3 text-sm text-white/70">
+              Para clínicas maiores e redes que precisam de controle e escala.
+            </div>
+            <ul className="mt-4 space-y-2 text-sm text-white/80">
+              <li>✅ Tudo do Pro</li>
+              <li>✅ Ajustes por operação</li>
+              <li>✅ Acompanhamento mais próximo</li>
+              <li>✅ Planejamento de escala</li>
+            </ul>
+            <div className="mt-6">
+              <WhatsAppCTA label="Falar com especialista" />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 text-center">
+          <WhatsAppCTA label="Quero o teste grátis e você me orienta" />
+        </div>
+      </section>
+
+      <Footer />
+    </main>
+  );
 }
