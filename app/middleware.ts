@@ -1,12 +1,40 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-export function middleware(_req: NextRequest) {
-  return NextResponse.next();
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  // Isso aqui faz o Supabase “renovar” e colocar cookie certo
+  await supabase.auth.getUser();
+
+  return res;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|mp4|webm|mov|css|js|map)$).*)",
+    /*
+      roda em tudo menos:
+      - arquivos estáticos
+      - imagens
+      - favicon
+    */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

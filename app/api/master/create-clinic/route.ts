@@ -1,120 +1,148 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
-type Body = {
-  name: string;
-  cnpj?: string | null;
-  phone?: string | null;
-  admin_email: string;
-  is_headquarters?: boolean;
-  parent_clinic_id?: string | null;
+// IMPORTS RELATIVOS CERTOS a partir de: app/api/master/create-clinic/route.ts
+import { supabaseAdmin } from "../../../lib/supabase/admin";
+import { createSupabaseServer } from "../../../lib/supabase/server";
+
+type CreateClinicBody = {
+  clinic_name?: string;
+  owner_name?: string;
+  email?: string; // opcional (se não vier, cria email de teste automático)
 };
+
+function buildTestEmail(clinicName: string) {
+  const slug = (clinicName || "clinica")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 40);
+
+  const stamp = Date.now().toString().slice(-6);
+  return `clinica+${slug}-${stamp}@odontoflow.online`;
+}
 
 export async function POST(req: Request) {
   try {
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    // 1) valida sessão do usuário logado (MASTER)
+    const supabase = await createSupabaseServer();
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
 
-    if (!SUPABASE_URL || !SERVICE_ROLE) {
+    if (authErr || !authData?.user) {
       return NextResponse.json(
-        { error: "ENV faltando: NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY" },
+        { ok: false, error: "Auth session missing! Faça login novamente." },
+        { status: 401 }
+      );
+    }
+
+    const user = authData.user;
+
+    // 2) garante role master
+    const { data: profile, error: profErr } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profErr || !profile) {
+      return NextResponse.json(
+        { ok: false, error: "Profile não encontrado. Rode o bootstrap-master novamente." },
+        { status: 403 }
+      );
+    }
+
+    if (profile.role !== "master") {
+      return NextResponse.json(
+        { ok: false, error: "Apenas MASTER pode criar clínicas." },
+        { status: 403 }
+      );
+    }
+
+    // 3) lê body
+    const body = (await req.json().catch(() => ({}))) as CreateClinicBody;
+
+    const clinicName = (body.clinic_name || "").trim();
+    const ownerName = (body.owner_name || "").trim();
+
+    if (!clinicName) {
+      return NextResponse.json({ ok: false, error: "Informe clinic_name." }, { status: 400 });
+    }
+
+    const defaultPassword = "123456";
+    const finalEmail = (body.email || "").trim() || buildTestEmail(clinicName);
+
+    // 4) cria clínica (trial 7 dias)
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: clinicRow, error: clinicErr } = await supabaseAdmin
+      .from("clinics")
+      .insert({
+        name: clinicName,
+        owner_name: ownerName || null,
+        status: "trial",
+        trial_ends_at: trialEndsAt,
+        blocked: false,
+      })
+      .select("id, name, status, trial_ends_at")
+      .single();
+
+    if (clinicErr || !clinicRow) {
+      return NextResponse.json(
+        { ok: false, error: clinicErr?.message || "Erro ao criar clínica." },
         { status: 500 }
       );
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const body = (await req.json()) as Body;
-
-    const name = (body.name || "").trim();
-    const admin_email = (body.admin_email || "").trim().toLowerCase();
-    const cnpj = (body.cnpj || null)?.toString().trim() || null;
-    const phone = (body.phone || null)?.toString().trim() || null;
-    const is_headquarters = !!body.is_headquarters;
-    const parent_clinic_id = body.parent_clinic_id || null;
-
-    if (!name) return NextResponse.json({ error: "Nome da clínica é obrigatório" }, { status: 400 });
-    if (!admin_email || !admin_email.includes("@")) {
-      return NextResponse.json({ error: "Email do admin inválido" }, { status: 400 });
-    }
-
-    // 1) cria usuário no AUTH primeiro (pra termos owner_id)
-    const tempPassword = `Odonto@${Math.random().toString(36).slice(2, 8)}!`;
-
+    // 5) cria usuário da clínica no Auth (admin)
     const { data: createdUser, error: createUserErr } = await supabaseAdmin.auth.admin.createUser({
-      email: admin_email,
-      password: tempPassword,
+      email: finalEmail,
+      password: defaultPassword,
       email_confirm: true,
     });
 
     if (createUserErr || !createdUser?.user) {
+      await supabaseAdmin.from("clinics").delete().eq("id", clinicRow.id);
+
       return NextResponse.json(
-        { error: `Falha ao criar usuário no Auth: ${createUserErr?.message || "sem detalhes"}`, details: createUserErr },
-        { status: 400 }
+        { ok: false, error: createUserErr?.message || "Erro ao criar usuário da clínica." },
+        { status: 500 }
       );
     }
 
-    const userId = createdUser.user.id;
+    const clinicUserId = createdUser.user.id;
 
-    // 2) cria a clínica com owner_id preenchido
-    const { data: clinic, error: clinicErr } = await supabaseAdmin
-      .from("clinics")
-      .insert({
-        name,
-        cnpj,
-        phone,
-        is_headquarters,
-        parent_clinic_id,
-        owner_id: userId, // <<< aqui está o conserto
-      })
-      .select("id, name")
-      .single();
+    // 6) cria profile do usuário da clínica (força troca de senha)
+    const { error: profInsertErr } = await supabaseAdmin.from("profiles").insert({
+      user_id: clinicUserId,
+      role: "clinic_admin",
+      clinic_id: clinicRow.id,
+      must_change_password: true,
+      full_name: ownerName || clinicName,
+    });
 
-    if (clinicErr || !clinic) {
-      // rollback: remove usuário criado, pra não sujar
-      await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (profInsertErr) {
+      await supabaseAdmin.auth.admin.deleteUser(clinicUserId);
+      await supabaseAdmin.from("clinics").delete().eq("id", clinicRow.id);
 
       return NextResponse.json(
-        { error: `Falha ao criar clínica: ${clinicErr?.message || "sem detalhes"}`, details: clinicErr },
-        { status: 400 }
-      );
-    }
-
-    // 3) cria/atualiza profile do admin da clínica
-    const { error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .upsert(
-        {
-          user_id: userId,
-          role: "clinic_admin",
-          clinic_id: clinic.id,
-          name: name,
-        },
-        { onConflict: "user_id" }
-      );
-
-    if (profileErr) {
-      // rollback: remove clinic + user
-      await supabaseAdmin.from("clinics").delete().eq("id", clinic.id);
-      await supabaseAdmin.auth.admin.deleteUser(userId);
-
-      return NextResponse.json(
-        { error: `Falha ao criar profile: ${profileErr.message}`, details: profileErr },
-        { status: 400 }
+        { ok: false, error: profInsertErr.message || "Erro ao criar profile do usuário." },
+        { status: 500 }
       );
     }
 
     return NextResponse.json({
       ok: true,
-      clinic: { id: clinic.id, name: clinic.name },
-      admin: { email: admin_email, user_id: userId },
-      temp_password: tempPassword,
+      clinic: clinicRow,
+      credentials: {
+        email: finalEmail,
+        password: defaultPassword,
+        note: "Senha padrão 123456. Usuário será obrigado a trocar no primeiro login.",
+      },
     });
-  } catch (err: any) {
+  } catch (e: any) {
     return NextResponse.json(
-      { error: err?.message || "Erro inesperado", details: String(err) },
+      { ok: false, error: e?.message || "Erro inesperado." },
       { status: 500 }
     );
   }

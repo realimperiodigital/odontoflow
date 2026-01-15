@@ -1,17 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-if (!supabaseServiceKey) {
-    // This might happen during build time if envs aren't loaded, but runtime validation is important.
-    console.warn("Missing SUPABASE_SERVICE_ROLE_KEY. Backend operations will fail.");
-}
+if (!url) throw new Error("SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL não configurado.");
+if (!serviceKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurado.");
 
-// Service role client - bypasses RLS. Use ONLY in trusted server environments (API Routes).
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-        autoRefreshToken: false,
-        persistSession: false
-    }
+export const supabaseAdmin = createClient(url, serviceKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
 });
