@@ -1,8 +1,12 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+  let res = NextResponse.next({
+    request: {
+      headers: req.headers,
+    },
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,20 +25,45 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  // Isso aqui faz o Supabase “renovar” e colocar cookie certo
-  await supabase.auth.getUser();
+  // IMPORTANTE: isso “atualiza” a sessão e evita o flash-login-logout
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = req.nextUrl.pathname;
+
+  const isProtected =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/franquias") ||
+    pathname.startsWith("/modulos") ||
+    pathname.startsWith("/planos");
+
+  const isAuthPage =
+    pathname.startsWith("/login") || pathname.startsWith("/trocar-senha");
+
+  if (isProtected && !user) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  if (isAuthPage && user && pathname === "/login") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
 
   return res;
 }
 
 export const config = {
   matcher: [
-    /*
-      roda em tudo menos:
-      - arquivos estáticos
-      - imagens
-      - favicon
-    */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/dashboard/:path*",
+    "/franquias/:path*",
+    "/modulos/:path*",
+    "/planos/:path*",
+    "/login",
+    "/trocar-senha",
   ],
 };
