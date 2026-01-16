@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient } from "@supabase/ssr";
 
 export async function createSupabaseServer() {
   const cookieStore = await cookies();
@@ -22,3 +22,6 @@ export async function createSupabaseServer() {
     }
   );
 }
+
+// compatibilidade com imports antigos
+export const supabaseServer = createSupabaseServer;

@@ -1,163 +1,81 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabase/admin";
 import { createSupabaseServer } from "../../../../lib/supabase/server";
 
-type PlanType = "trial" | "start" | "pro" | "premium";
-
-function normalizeEmail(email: string) {
-  return (email || "").trim().toLowerCase();
-}
-
+// Esperado no body:
+// {
+//   "clinic_name": "OdontoFlow 01",
+//   "admin_email": "clinica@email.com",
+//   "admin_password": "odontoflow123" (opcional)
+// }
 export async function POST(req: Request) {
   try {
-    // 1) Pega o usuário logado (Master) pela sessão do site
-    const supabase = await createSupabaseServer();
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    const body = await req.json().catch(() => ({}));
 
-    if (userErr || !userData?.user) {
+    const clinic_name = String(body?.clinic_name ?? "").trim();
+    const admin_email = String(body?.admin_email ?? "").trim().toLowerCase();
+    const admin_password = String(body?.admin_password ?? "odontoflow123");
+
+    const masterSecret = String(body?.master_secret ?? "");
+    const expectedSecret = process.env.MASTER_RESET_SECRET ?? "";
+
+    if (!expectedSecret) {
       return NextResponse.json(
-        { ok: false, error: "Você precisa estar logado como MASTER para criar clínica." },
-        { status: 401 }
+        { ok: false, error: "MASTER_RESET_SECRET não está configurado no .env.local" },
+        { status: 500 }
       );
     }
 
-    const masterUser = userData.user;
-    const masterEmail = normalizeEmail(masterUser.email || "");
-    const allowedMasterEmail = normalizeEmail(process.env.MASTER_EMAIL || "");
+    if (!masterSecret || masterSecret !== expectedSecret) {
+      return NextResponse.json({ ok: false, error: "Segredo inválido" }, { status: 401 });
+    }
 
-    // Se você tiver MASTER_EMAIL no .env (recomendado), trava por email
-    if (allowedMasterEmail && masterEmail !== allowedMasterEmail) {
+    if (!clinic_name || !admin_email) {
       return NextResponse.json(
-        { ok: false, error: "Acesso negado. Este usuário não é MASTER." },
-        { status: 403 }
-      );
-    }
-
-    // 2) Lê dados enviados
-    const body = await req.json();
-
-    const clinicName = String(body?.clinicName || "").trim();
-    const adminEmail = normalizeEmail(String(body?.adminEmail || ""));
-    const adminPassword = String(body?.adminPassword || "odontoflow123").trim();
-
-    const planType: PlanType = (body?.plan?.type || "trial") as PlanType;
-    const trialDays = Number(body?.plan?.trialDays ?? 7);
-    const patientLimit = Number(body?.plan?.patientLimit ?? 30);
-    const userLimit = Number(body?.plan?.userLimit ?? 1);
-
-    const cnpj = body?.cnpj ? String(body.cnpj).trim() : null;
-    const phone = body?.phone ? String(body.phone).trim() : null;
-
-    if (!clinicName) {
-      return NextResponse.json({ ok: false, error: "Informe o nome da clínica." }, { status: 400 });
-    }
-    if (!adminEmail) {
-      return NextResponse.json({ ok: false, error: "Informe o email do usuário admin da clínica." }, { status: 400 });
-    }
-    if (!adminPassword || adminPassword.length < 6) {
-      return NextResponse.json(
-        { ok: false, error: "A senha provisória precisa ter pelo menos 6 caracteres." },
+        { ok: false, error: "clinic_name e admin_email são obrigatórios" },
         { status: 400 }
       );
     }
 
-    // 3) Cria (ou reaproveita) o usuário admin da clínica no Auth
-    //    Se já existir, a gente só usa o ID dele.
-    let adminUserId: string | null = null;
+    const supabase = await createSupabaseServer();
 
-    // tenta achar usuário pelo email
-    const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 2000,
-    });
-
-    if (listErr) {
-      return NextResponse.json({ ok: false, error: listErr.message }, { status: 500 });
-    }
-
-    const existing = (list?.users || []).find((u) => normalizeEmail(u.email || "") === adminEmail);
-    if (existing?.id) {
-      adminUserId = existing.id;
-    } else {
-      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email: adminEmail,
-        password: adminPassword,
-        email_confirm: true,
-      });
-
-      if (createErr) {
-        return NextResponse.json({ ok: false, error: createErr.message }, { status: 500 });
-      }
-
-      adminUserId = created?.user?.id || null;
-    }
-
-    if (!adminUserId) {
-      return NextResponse.json({ ok: false, error: "Não consegui obter o ID do usuário admin." }, { status: 500 });
-    }
-
-    // 4) Cria a clínica (IMPORTANTE: owner_id é o admin da clínica, então nunca fica nulo)
-    const { data: clinicInserted, error: clinicErr } = await supabaseAdmin
+    // 1) cria a clínica
+    const { data: clinic, error: clinicErr } = await supabase
       .from("clinics")
-      .insert({
-        name: clinicName,
-        cnpj,
-        phone,
-        is_headquarters: false,
-        parent_clinic_id: null,
-        owner_id: adminUserId,
-      })
-      .select("id, name, owner_id, created_at")
+      .insert({ name: clinic_name })
+      .select("*")
       .single();
 
     if (clinicErr) {
-      return NextResponse.json({ ok: false, error: clinicErr.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: clinicErr.message }, { status: 400 });
     }
 
-    const clinicId = clinicInserted?.id;
+    // 2) cria o perfil admin da clínica (vinculando por email)
+    // Aqui eu NÃO estou criando usuário no Auth (porque isso exige service_role/admin client).
+    // O fluxo ideal é: você cria o usuário via painel do Supabase ou com um admin client,
+    // e no primeiro login o sistema vincula o user.id ao profile.
+    const { data: profile, error: profErr } = await supabase
+      .from("profiles")
+      .insert({
+        email: admin_email,
+        role: "clinic_admin",
+        clinic_id: clinic.id,
+        temp_password: admin_password,
+      })
+      .select("*")
+      .single();
 
-    // 5) (Opcional, mas recomendado) liga Master -> clínica numa tabela própria
-    //    Se a tabela não existir ainda, a gente ignora sem quebrar.
-    try {
-      await supabaseAdmin.from("master_clinics").insert({
-        master_id: masterUser.id,
-        clinic_id: clinicId,
-      });
-    } catch (_) {}
-
-    // 6) (Opcional) liga o admin da clínica na clínica (se você já tiver a tabela clinic_users)
-    try {
-      await supabaseAdmin.from("clinic_users").insert({
-        clinic_id: clinicId,
-        user_id: adminUserId,
-        role: "admin",
-        is_active: true,
-      });
-    } catch (_) {}
-
-    // 7) (Opcional) salva o plano/limites (se você tiver tabela de assinatura)
-    try {
-      await supabaseAdmin.from("clinic_plans").insert({
-        clinic_id: clinicId,
-        plan_type: planType,
-        trial_days: trialDays,
-        patient_limit: patientLimit,
-        user_limit: userLimit,
-        starts_at: new Date().toISOString(),
-      });
-    } catch (_) {}
+    if (profErr) {
+      return NextResponse.json({ ok: false, error: profErr.message }, { status: 400 });
+    }
 
     return NextResponse.json({
       ok: true,
-      clinic: clinicInserted,
-      adminUser: { id: adminUserId, email: adminEmail },
-      plan: { type: planType, trialDays, patientLimit, userLimit },
-      message: "Clínica criada com sucesso.",
+      clinic,
+      profile,
+      next_step:
+        "Crie o usuário no Auth com esse email (ou use um admin client). No primeiro login, o sistema vincula o profile ao user.id.",
     });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message || "Unexpected error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: e?.message ?? "Erro inesperado" }, { status: 500 });
   }
 }

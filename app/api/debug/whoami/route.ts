@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/app/lib/supabase/server";
+import { createSupabaseServer } from "../../../../lib/supabase/server";
 
 export async function GET() {
-  const supabase = await createSupabaseServer();
-  const { data, error } = await supabase.auth.getUser();
+  try {
+    const supabase = await createSupabaseServer();
+    const { data, error } = await supabase.auth.getUser();
 
-  return NextResponse.json({
-    ok: true,
-    user: data.user ? { id: data.user.id, email: data.user.email } : null,
-    error: error?.message || null,
-  });
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 401 });
+    }
+
+    return NextResponse.json({ ok: true, user: data.user ?? null });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? "Erro inesperado" }, { status: 500 });
+  }
 }

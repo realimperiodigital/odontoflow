@@ -1,80 +1,86 @@
+// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createSupabaseBrowser } from "../../lib/supabase/browser";
+import { useRouter, useSearchParams } from "next/navigation";
+import { supabaseBrowser } from "@/lib/supabase/browser";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState("realimperiodigital@gmail.com");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
+  const msg = searchParams.get("msg");
+
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setMsg(null);
 
-    const supabase = createSupabaseBrowser();
+    try {
+      const { error } = await supabaseBrowser.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+      if (error) {
+        router.replace(`/login?msg=${encodeURIComponent(error.message)}`);
+        return;
+      }
 
-    if (error) {
-      setMsg(`Erro: ${error.message}`);
+      // Garantia extra: força o Next a revalidar a sessão
+      router.replace("/app");
+      router.refresh();
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.replace("/app");
-    router.refresh();
   }
 
   return (
     <main className="min-h-screen bg-[#05060a] text-white flex items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6">
         <h1 className="text-2xl font-semibold">Login</h1>
-        <p className="text-white/60 mt-1">Entre com seu usuário MASTER.</p>
+        <p className="mt-1 text-sm text-white/60">Entre com seu usuário MASTER.</p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <div>
             <label className="text-sm text-white/70">Email</label>
             <input
-              className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white outline-none"
+              placeholder="seu@email.com"
+              type="email"
+              required
             />
           </div>
 
           <div>
             <label className="text-sm text-white/70">Senha</label>
             <input
-              className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              type="password"
+              className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white outline-none"
               placeholder="Sua senha"
-              autoComplete="current-password"
+              type="password"
+              required
             />
           </div>
-
-          <button
-            disabled={loading}
-            className="w-full h-12 rounded-xl bg-white text-black font-semibold disabled:opacity-60"
-            type="submit"
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
 
           {msg ? (
             <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/80">
               {msg}
             </div>
           ) : null}
+
+          <button
+            disabled={loading}
+            className="w-full rounded-xl bg-white text-black py-3 font-semibold disabled:opacity-60"
+          >
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
         </form>
       </div>
     </main>

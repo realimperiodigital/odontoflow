@@ -1,16 +1,27 @@
 import { redirect } from "next/navigation";
+import { createSupabaseServer } from "../../lib/supabase/server";
 import MasterDashboard from "./MasterDashboard";
-import { createSupabaseServer } from "../../lib/supabase/server"; // ajuste se seu export tiver outro nome
 
 export default async function AppPage() {
   const supabase = await createSupabaseServer();
 
-  const { data } = await supabase.auth.getUser();
-  const user = data?.user;
+  const { data, error } = await supabase.auth.getUser();
+  const user = data?.user ?? null;
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (error || !user) redirect("/login");
+
+  // tenta buscar perfil
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // sem perfil -> primeiro acesso
+  if (!profile) redirect("/first-access");
+
+  // se não for master -> painel da clínica
+  if (profile.role !== "master") redirect("/app/clinica");
 
   return <MasterDashboard masterEmail={user.email ?? ""} />;
 }
