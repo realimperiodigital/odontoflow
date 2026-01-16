@@ -1,89 +1,91 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { createSupabaseBrowser } from "@/app/lib/supabase/client";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const supabase = useMemo(() => createSupabaseBrowser(), []);
-  const [email, setEmail] = useState("realimperiodigital@gmail.com");
-  const [password, setPassword] = useState("");
+  const supabase = createSupabaseBrowser();
+
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  async function onSubmit(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setMsg("");
     setLoading(true);
+    setMsg("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: senha
     });
 
     if (error) {
-      setMsg("Erro no login: " + error.message);
+      setMsg("Email ou senha inválidos");
       setLoading(false);
       return;
     }
 
-    // força cookie/sessão a estabilizar e o server enxergar
-    await supabase.auth.getSession();
+    window.location.href = "/dashboard";
+  }
 
-    setMsg("Logado! Redirecionando...");
+  async function handleReset() {
+    if (!email) {
+      alert("Digite seu email");
+      return;
+    }
 
-    router.push("/dashboard");
-    router.refresh();
-    setLoading(false);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/trocar-senha`
+    });
+
+    if (error) {
+      alert("Erro ao enviar email de redefinição");
+      return;
+    }
+
+    alert("Email de redefinição enviado. Verifique sua caixa de entrada.");
   }
 
   return (
-    <main className="min-h-screen bg-[#05060a] text-white flex items-center justify-center px-6">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6">
-        <h1 className="text-xl font-semibold">Login</h1>
-        <p className="text-sm text-white/60 mt-1">Entre com seu usuário MASTER.</p>
+    <main className="min-h-screen flex items-center justify-center bg-[#05060a] text-white">
+      <form onSubmit={handleLogin} className="bg-white/5 p-8 rounded-xl w-full max-w-md space-y-4">
+        <h1 className="text-xl font-semibold">Entrar no OdontoFlow</h1>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-3">
-          <div className="space-y-1">
-            <label className="text-sm text-white/70">Email</label>
-            <input
-              className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 outline-none"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
-          </div>
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full p-3 rounded bg-black/40 border border-white/10"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+        />
 
-          <div className="space-y-1">
-            <label className="text-sm text-white/70">Senha</label>
-            <input
-              className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 outline-none"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
+        <input
+          type="password"
+          placeholder="Senha"
+          className="w-full p-3 rounded bg-black/40 border border-white/10"
+          value={senha}
+          onChange={e => setSenha(e.target.value)}
+        />
 
-          <button
-            disabled={loading}
-            className="w-full rounded-xl bg-white text-black font-semibold py-2 disabled:opacity-60"
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+        {msg && <p className="text-red-400 text-sm">{msg}</p>}
 
-        {msg && (
-          <pre className="mt-4 text-xs whitespace-pre-wrap rounded-xl bg-black/40 border border-white/10 p-3">
-            {msg}
-          </pre>
-        )}
+        <button
+          disabled={loading}
+          className="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded font-semibold"
+        >
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
 
-        <div className="mt-4 text-xs text-white/50">
-          Dica: se aparecer “Invalid login credentials”, a senha não bate com o usuário do Supabase Auth.
-        </div>
-      </div>
+        <button
+          type="button"
+          onClick={handleReset}
+          className="text-sm text-white/60 hover:text-white underline w-full text-center"
+        >
+          Esqueci minha senha
+        </button>
+      </form>
     </main>
   );
 }
