@@ -1,154 +1,114 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/app/lib/supabaseAdmin';
-import { createClient } from '@supabase/supabase-js';
+// app/api/create-user/route.ts
+import { NextResponse } from "next/server";
+import { createSupabaseRouteClient } from "@/lib/supabase/route";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// Initializes a client to verify the caller's session (standard user)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+function pickString(v: unknown) {
+  if (typeof v === "string") return v.trim();
+  return "";
+}
 
-export async function POST(req: NextRequest) {
-    try {
-        // 1. Verify Authentication of the requester
-        // We need to check if the requester is logged in and is a 'clinic_admin' or 'master'
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) {
-            return NextResponse.json({ error: 'Missing Authorization header' }, { status: 401 });
-        }
+export async function POST(req: Request) {
+  const supabase = await createSupabaseRouteClient();
 
-        const token = authHeader.replace('Bearer ', '');
-        const supabase = createClient(supabaseUrl, supabaseAnon);
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  // 1) quem está criando (tem que estar logado)
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !authData?.user) {
+    return NextResponse.json({ ok: false, error: "Não autenticado" }, { status: 401 });
+  }
 
-        if (userError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+  // 2) pega perfil do requester (ajuste os nomes se sua tabela for diferente)
+  const { data: requesterProfile } = await supabase
+    .from("profiles")
+    .select("role, clinic_id")
+    .eq("id", authData.user.id)
+    .maybeSingle();
 
-        // 2. Get requester's profile to check role and clinic_id
-        // We use supabaseAdmin here to be sure we can read profiles, but RLS should allow reading own profile.
-        // Using admin for safety to ensure we get the data.
-        const { data: requesterProfile, error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .select('role, clinic_id')
-            .eq('user_id', user.id)
-            .single();
+  const requesterRole = requesterProfile?.role || "";
+  const requesterClinicId = requesterProfile?.clinic_id || null;
 
-        if (profileError || !requesterProfile) {
-            return NextResponse.json({ error: 'Profile not found' }, { status: 403 });
-        }
+  // só master ou clinic_admin
+  if (requesterRole !== "master" && requesterRole !== "clinic_admin") {
+    return NextResponse.json({ ok: false, error: "Sem permissão" }, { status: 403 });
+  }
 
-        const { role: requesterRole, clinic_id: requesterClinicId } = requesterProfile;
+  // 3) body
+  const ct = req.headers.get("content-type") || "";
+  let name = "";
+  let email = "";
+  let password = "";
+  let role = "clinic_user";
+  let clinic_id: string | null = null;
 
-        // Only master or clinic_admin can create users
-        if (requesterRole !== 'master' && requesterRole !== 'clinic_admin') {
-            return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
-        }
+  if (ct.includes("application/json")) {
+    const body = await req.json().catch(() => ({}));
+    name = pickString(body?.name);
+    email = pickString(body?.email);
+    password = pickString(body?.password);
+    role = pickString(body?.role) || role;
+    clinic_id = pickString(body?.clinic_id) || null;
+  } else {
+    const form = await req.formData().catch(() => null);
+    name = pickString(form?.get("name"));
+    email = pickString(form?.get("email"));
+    password = pickString(form?.get("password"));
+    role = pickString(form?.get("role")) || role;
+    clinic_id = pickString(form?.get("clinic_id")) || null;
+  }
 
-        // 3. Parse Request Body
-        const body = await req.json();
-        const {
-            name,
-            email,
-            department,
-            job_title,
-            phone,
-            role,
-            birth_date,
-            // Optional: override clinic_id (only for master?) 
-            // For clinic_admin, MUST use requesterClinicId
-            target_clinic_id
-        } = body;
+  if (!email || !password) {
+    return NextResponse.json({ ok: false, error: "Email e senha são obrigatórios" }, { status: 400 });
+  }
 
-        // Validation
-        if (!email || !role || !name) {
-            return NextResponse.json({ error: 'Missing required fields (email, role, name)' }, { status: 400 });
-        }
+  // se não vier clinic_id e o requester não for master, força a clínica do requester
+  if (!clinic_id && requesterRole !== "master") {
+    clinic_id = requesterClinicId;
+  }
 
-        // Determine target clinic
-        let finalClinicId = requesterClinicId;
-        if (requesterRole === 'master' && target_clinic_id) {
-            finalClinicId = target_clinic_id;
-        }
+  if (!clinic_id) {
+    return NextResponse.json({ ok: false, error: "clinic_id é obrigatório" }, { status: 400 });
+  }
 
-        if (!finalClinicId && requesterRole !== 'master') {
-            // Master creating a master user? Maybe. But typical flow is creating clinic staff.
-            return NextResponse.json({ error: 'Clinic ID context missing' }, { status: 400 });
-        }
+  // 4) cria usuário no Auth (service role)
+  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
 
-        // 4. Create User in Supabase Auth (using Service Role)
-        // Generate a temporary password
-        const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8); // simple random pass
+  if (createErr || !created?.user) {
+    return NextResponse.json({ ok: false, error: createErr?.message || "Falha ao criar usuário" }, { status: 500 });
+  }
 
-        const { data: createdUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: { full_name: name }
-        });
+  const newUserId = created.user.id;
 
-        if (createError) {
-            return NextResponse.json({ error: createError.message }, { status: 400 });
-        }
+  // 5) cria/atualiza profile
+  // ajuste nomes de colunas conforme seu banco:
+  const { error: profErr } = await supabase
+    .from("profiles")
+    .upsert({
+      id: newUserId,
+      name: name || null,
+      role,
+      clinic_id,
+    });
 
-        if (!createdUser.user) {
-            return NextResponse.json({ error: 'User creation failed unexpectedly' }, { status: 500 });
-        }
+  if (profErr) {
+    return NextResponse.json({ ok: false, error: profErr.message }, { status: 500 });
+  }
 
-        // 5. Create Profile
-        // The trigger might have created a profile already? 
-        // In Phase 1.1 we created a trigger "Ao criar uma clínica...".
-        // Wait, the Phase 1.1 trigger was: "Ao criar um usuário... criar automaticamente um profile".
-        // If that trigger exists and is active, it will create a profile. We need to UPDATE it with the details.
-        // IF the trigger creates it with default 'admin', we need to fix it.
+  // 6) cria vínculo na clinic_users (se você usa isso)
+  const { error: linkErr } = await supabase
+    .from("clinic_users")
+    .upsert({
+      user_id: newUserId,
+      clinic_id,
+      role,
+    });
 
-        // Let's assume the trigger exists. We will upsert/update the profile.
-        const { error: profileUpdateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-                clinic_id: finalClinicId,
-                role: role, // 'reception', 'financial', 'dentist', 'staff'
-                full_name: name,
-                department,
-                job_title,
-                phone,
-                birth_date: birth_date || null,
-                must_change_password: true
-            })
-            .eq('user_id', createdUser.user.id);
+  if (linkErr) {
+    return NextResponse.json({ ok: false, error: linkErr.message }, { status: 500 });
+  }
 
-        // If update fails (maybe record doesn't exist if trigger didn't run?), we try insert.
-        if (profileUpdateError) {
-            // Try insert if update failed (though likely it failed due to schema/logic, but let's try upsert logic)
-            // Actually, best to UPSERT.
-            const { error: upsertError } = await supabaseAdmin
-                .from('profiles')
-                .upsert({
-                    user_id: createdUser.user.id,
-                    clinic_id: finalClinicId,
-                    role: role,
-                    full_name: name,
-                    department,
-                    job_title,
-                    phone,
-                    birth_date: birth_date || null,
-                    must_change_password: true
-                });
-
-            if (upsertError) {
-                // Rollback user creation? Hard to do perfectly, but good hygiene.
-                await supabaseAdmin.auth.admin.deleteUser(createdUser.user.id);
-                return NextResponse.json({ error: 'Failed to create profile: ' + upsertError.message }, { status: 500 });
-            }
-        }
-
-        // 6. Return Success + Temp Password
-        return NextResponse.json({
-            success: true,
-            temp_password: tempPassword,
-            user_id: createdUser.user.id
-        });
-
-    } catch (err: any) {
-        console.error('API create-user error:', err);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
+  return NextResponse.json({ ok: true, user_id: newUserId });
 }

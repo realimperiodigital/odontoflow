@@ -1,27 +1,25 @@
+// app/app/page.tsx
 import { redirect } from "next/navigation";
-import { createSupabaseServer } from "../../lib/supabase/server";
-import MasterDashboard from "./MasterDashboard";
+import { createSupabaseReadOnly } from "@/lib/supabase/readonly";
 
-export default async function AppPage() {
-  const supabase = await createSupabaseServer();
+export default async function AppEntry() {
+  const supabase = await createSupabaseReadOnly();
 
-  const { data, error } = await supabase.auth.getUser();
-  const user = data?.user ?? null;
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) {
+    redirect("/login");
+  }
 
-  if (error || !user) redirect("/login");
-
-  // tenta buscar perfil
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
+  // procura vínculo com clínica
+  const { data: membership } = await supabase
+    .from("clinic_users")
+    .select("clinic_id")
+    .eq("user_id", data.user.id)
     .maybeSingle();
 
-  // sem perfil -> primeiro acesso
-  if (!profile) redirect("/first-access");
+  if (!membership?.clinic_id) {
+    redirect("/first-access");
+  }
 
-  // se não for master -> painel da clínica
-  if (profile.role !== "master") redirect("/app/clinica");
-
-  return <MasterDashboard masterEmail={user.email ?? ""} />;
+  redirect("/dashboard");
 }

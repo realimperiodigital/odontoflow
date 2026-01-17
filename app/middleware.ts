@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/favicon.ico"];
-
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+  let res = NextResponse.next();
 
+  // Supabase SSR client (esse cara é quem "enxerga" a sessão via cookies)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -23,33 +22,37 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  // isso aqui evita sessão “meia quebrada” e loop
+  // MUITO IMPORTANTE: isso atualiza/garante a sessão (evita loop pro login)
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = req.nextUrl.pathname;
+  const path = req.nextUrl.pathname;
 
+  // Rotas públicas (não precisa estar logado)
   const isPublic =
-    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/assets") ||
-    pathname.startsWith("/public");
+    path === "/" ||
+    path.startsWith("/login") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/first-access");
 
-  // 1) se NÃO está logado e está tentando entrar em área protegida -> /login
-  if (!user && !isPublic && pathname.startsWith("/app")) {
+  // Se está tentando acessar área protegida sem login -> manda pro login
+  const isProtected = path.startsWith("/app");
+  if (isProtected && !user) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
+    url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
 
-  // 2) se está logado e tenta ir pro /login -> /app
-  if (user && pathname === "/login") {
+  // Se já está logado e entra no /login -> manda direto pra área
+  if (path.startsWith("/login") && user) {
     const url = req.nextUrl.clone();
     url.pathname = "/app";
     return NextResponse.redirect(url);
   }
 
+  // Deixa passar
   return res;
 }
 

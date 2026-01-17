@@ -1,10 +1,25 @@
-export default function AgendaPage() {
-  return (
-    <div style={{ padding: 24 }}>
-      <h1 style={{ fontSize: 26, marginBottom: 8 }}>Agenda</h1>
-      <p style={{ opacity: 0.7 }}>
-        Página de teste do dashboard. Depois a gente liga com Supabase.
-      </p>
-    </div>
-  );
+// app/app/page.tsx
+import { redirect } from "next/navigation";
+import { createSupabaseReadOnly } from "@/lib/supabase/readonly";
+
+export default async function AppEntry() {
+  const supabase = await createSupabaseReadOnly();
+
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) {
+    redirect("/login");
+  }
+
+  // procura vínculo com clínica
+  const { data: membership } = await supabase
+    .from("clinic_users")
+    .select("clinic_id")
+    .eq("user_id", data.user.id)
+    .maybeSingle();
+
+  if (!membership?.clinic_id) {
+    redirect("/first-access");
+  }
+
+  redirect("/dashboard");
 }
