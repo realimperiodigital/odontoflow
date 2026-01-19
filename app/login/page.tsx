@@ -32,53 +32,53 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#05060a] text-white">
+    <main className="min-h-screen flex items-center justify-center bg-black text-white">
       <form
         onSubmit={handleLogin}
-        className="w-full max-w-sm bg-white/5 p-8 rounded-xl border border-white/10"
+        className="w-full max-w-sm rounded-xl bg-zinc-900 p-6 shadow-lg"
+        autoComplete="off"
       >
-        <h1 className="text-2xl font-semibold mb-6 text-center">
-          Entrar no OdontoFlow
-        </h1>
+        <h1 className="text-xl font-semibold mb-1">Login</h1>
+        <p className="text-sm text-zinc-400 mb-6">
+          Entre com seu usuário MASTER.
+        </p>
+
+        <div className="mb-4">
+          <label className="block text-sm mb-1">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="seu@email.com"
+            autoComplete="off"
+            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm outline-none focus:border-white"
+            required
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm mb-1">Senha</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Sua senha"
+            autoComplete="new-password"
+            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm outline-none focus:border-white"
+            required
+          />
+        </div>
 
         {error && (
-          <div className="mb-4 text-sm text-red-400 text-center">
-            {error}
-          </div>
+          <p className="text-sm text-red-500 mb-3">{error}</p>
         )}
-
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full mb-3 px-4 py-3 rounded-lg bg-black/40 border border-white/10 outline-none"
-        />
-
-        <input
-          type="password"
-          placeholder="Senha"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="w-full mb-4 px-4 py-3 rounded-lg bg-black/40 border border-white/10 outline-none"
-        />
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl bg-white text-black px-4 py-3 font-semibold hover:bg-white/90 transition"
+          className="w-full rounded-lg bg-white text-black py-2 text-sm font-semibold hover:bg-zinc-200 transition"
         >
           {loading ? "Entrando..." : "Entrar"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="w-full mt-3 rounded-xl border border-white/20 px-4 py-3 text-sm hover:bg-white/5"
-        >
-          Voltar
         </button>
       </form>
     </main>
