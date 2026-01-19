@@ -1,82 +1,84 @@
 "use client";
 
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { createSupabaseBrowser } from "@/lib/supabase/browser";
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createSupabaseBrowser();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
       password,
     });
 
     if (error) {
-      setError("Email ou senha inválidos");
+      setError("Email ou senha inválidos.");
       setLoading(false);
       return;
     }
 
-    router.push("/dashboard");
+    if (!data.session) {
+      setError("Falha ao criar sessão.");
+      setLoading(false);
+      return;
+    }
+
+    router.replace("/app");
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-white">
       <form
         onSubmit={handleLogin}
-        className="w-full max-w-sm rounded-xl bg-zinc-900 p-6 shadow-lg"
-        autoComplete="off"
+        className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-6"
       >
         <h1 className="text-xl font-semibold mb-1">Login</h1>
-        <p className="text-sm text-zinc-400 mb-6">
+        <p className="text-sm text-white/60 mb-6">
           Entre com seu usuário MASTER.
         </p>
 
-        <div className="mb-4">
-          <label className="block text-sm mb-1">Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seu@email.com"
-            autoComplete="off"
-            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm outline-none focus:border-white"
-            required
-          />
-        </div>
+        <label className="text-sm">Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="seuemail@email.com"
+          autoComplete="off"
+          className="w-full mt-2 mb-4 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none"
+          required
+        />
 
-        <div className="mb-4">
-          <label className="block text-sm mb-1">Senha</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Sua senha"
-            autoComplete="new-password"
-            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm outline-none focus:border-white"
-            required
-          />
-        </div>
+        <label className="text-sm">Senha</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Sua senha"
+          autoComplete="off"
+          className="w-full mt-2 mb-4 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none"
+          required
+        />
 
         {error && (
-          <p className="text-sm text-red-500 mb-3">{error}</p>
+          <div className="text-red-400 text-sm mb-4">{error}</div>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-white text-black py-2 text-sm font-semibold hover:bg-zinc-200 transition"
+          className="w-full bg-white text-black font-semibold py-3 rounded-xl"
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>
