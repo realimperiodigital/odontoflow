@@ -1,57 +1,52 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase/browser";
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = useMemo(() => createSupabaseBrowser(), []);
+  const supabase = createSupabaseBrowser();
 
   const emailRef = useRef<HTMLInputElement | null>(null);
   const passRef = useRef<HTMLInputElement | null>(null);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Zera input no DOM (mesmo que o navegador/autofill tente colocar algo)
-  function hardClearInputs() {
-    setEmail("");
-    setPassword("");
-    if (emailRef.current) emailRef.current.value = "";
-    if (passRef.current) passRef.current.value = "";
-  }
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1) Garante que a página de login SEMPRE abre "limpa"
-    hardClearInputs();
+    // trava e limpa pra impedir qualquer preenchimento vindo de fora
+    const lockAndClear = () => {
+      if (emailRef.current) {
+        emailRef.current.readOnly = true;
+        emailRef.current.value = "";
+      }
+      if (passRef.current) {
+        passRef.current.readOnly = true;
+        passRef.current.value = "";
+      }
+    };
 
-    // 2) Se tiver sessão antiga presa, derruba (isso evita “efeito fantasma”)
-    // Se você quiser manter sessão e só limpar o campo, comente esta linha.
-    supabase.auth.signOut().catch(() => {});
+    lockAndClear();
 
-    // 3) Mata o autofill insistente: limpa algumas vezes nos primeiros 1-2s
-    // (Chrome às vezes preenche depois que o React renderiza)
-    let i = 0;
+    // limpa algumas vezes no início (caso algo injete depois do primeiro render)
+    let n = 0;
     const iv = setInterval(() => {
-      i += 1;
-      const domEmail = emailRef.current?.value ?? "";
-      const domPass = passRef.current?.value ?? "";
+      n += 1;
+      lockAndClear();
+      if (n >= 12) clearInterval(iv);
+    }, 120);
 
-      if (domEmail) emailRef.current!.value = "";
-      if (domPass) passRef.current!.value = "";
+    // libera pra digitar depois que a “injeção” já teria acontecido
+    const t = setTimeout(() => {
+      if (emailRef.current) emailRef.current.readOnly = false;
+      if (passRef.current) passRef.current.readOnly = false;
+    }, 800);
 
-      // também zera o state para não voltar
-      if (email) setEmail("");
-      if (password) setPassword("");
-
-      if (i >= 10) clearInterval(iv);
-    }, 150);
-
-    return () => clearInterval(iv);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      clearInterval(iv);
+      clearTimeout(t);
+    };
   }, []);
 
   async function handleLogin(e: FormEvent) {
@@ -60,22 +55,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const cleanEmail = (emailRef.current?.value ?? email).trim();
-      const cleanPass = passRef.current?.value ?? password;
+      const email = (emailRef.current?.value ?? "").trim();
+      const password = passRef.current?.value ?? "";
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: cleanPass,
+        email,
+        password,
       });
 
-      if (error) {
+      if (error || !data?.session) {
         setError("Email ou senha inválidos.");
-        setLoading(false);
-        return;
-      }
-
-      if (!data?.session) {
-        setError("Sessão não foi criada. Tente novamente.");
         setLoading(false);
         return;
       }
@@ -96,28 +85,20 @@ export default function LoginPage() {
         className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-6"
       >
         <h1 className="text-xl font-semibold mb-1">Login</h1>
-        <p className="text-sm text-white/60 mb-6">
-          Entre com seu usuário MASTER.
-        </p>
 
-        {/* Iscas invisíveis pra enganar autofill */}
-        <input className="hidden" tabIndex={-1} autoComplete="username" />
-        <input className="hidden" tabIndex={-1} autoComplete="current-password" />
+        {/* CARIMBO pra provar que o deploy atualizou */}
+        <p className="text-sm text-white/60 mb-6">
+          Entre com seu usuário MASTER. (DEPLOY-1901-1646)
+        </p>
 
         <label className="text-sm">Email</label>
         <input
           ref={emailRef}
           type="email"
-          name="email_fake"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onFocus={hardClearInputs}
+          name="email"
           placeholder="seuemail@dominio.com"
-          autoComplete="new-password"
-          autoCorrect="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          className="w-full mt-2 mb-4 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none focus:border-white/30"
+          autoComplete="off"
+          className="w-full mt-2 mb-4 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none"
           required
         />
 
@@ -125,16 +106,10 @@ export default function LoginPage() {
         <input
           ref={passRef}
           type="password"
-          name="password_fake"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onFocus={() => {
-            if (passRef.current) passRef.current.value = "";
-            setPassword("");
-          }}
+          name="password"
           placeholder="Sua senha"
-          autoComplete="new-password"
-          className="w-full mt-2 mb-4 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none focus:border-white/30"
+          autoComplete="off"
+          className="w-full mt-2 mb-4 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none"
           required
         />
 
