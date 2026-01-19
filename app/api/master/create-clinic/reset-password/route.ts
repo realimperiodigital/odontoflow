@@ -1,105 +1,76 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabase/admin";
+import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs";
-
-function corsHeaders(origin?: string) {
-  // libera só seu próprio domínio (e localhost)
-  const allowed = new Set([
-    "https://odontoflow.online",
-    "https://www.odontoflow.online",
-    "http://localhost:3000",
-  ]);
-
-  const o = origin && allowed.has(origin) ? origin : "https://www.odontoflow.online";
-
+function corsHeaders(origin: string | null) {
   return {
-    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Origin": origin ?? "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }
 
 export async function OPTIONS(req: Request) {
-  const origin = req.headers.get("origin") || undefined;
+  const origin = req.headers.get("origin");
   return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
 }
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin") || undefined;
+  const origin = req.headers.get("origin");
 
   try {
-    const body = await req.json().catch(() => ({}));
+    const SUPABASE_URL =
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    const MASTER_RESET_SECRET = process.env.MASTER_RESET_SECRET || "";
 
-    const email = String(body?.email || "").trim().toLowerCase();
-    const newPassword = String(body?.newPassword || "").trim();
-    const secret = String(body?.secret || "").trim();
-
-    const expectedSecret = process.env.MASTER_RESET_SECRET || "";
-
-    if (!expectedSecret) {
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
       return NextResponse.json(
-        { ok: false, error: "MASTER_RESET_SECRET não configurado no servidor." },
+        { ok: false, error: "Variáveis do Supabase não configuradas na Vercel." },
         { status: 500, headers: corsHeaders(origin) }
       );
     }
 
-    if (secret !== expectedSecret) {
+    const body = await req.json().catch(() => ({}));
+    const secret = String(body?.secret || "");
+    const userId = String(body?.userId || body?.user_id || "");
+    const newPassword = String(body?.newPassword || body?.new_password || "");
+
+    if (!MASTER_RESET_SECRET) {
       return NextResponse.json(
-        { ok: false, error: "Unauthorized (secret inválido)." },
+        { ok: false, error: "MASTER_RESET_SECRET não está configurada." },
+        { status: 500, headers: corsHeaders(origin) }
+      );
+    }
+
+    if (!secret || secret !== MASTER_RESET_SECRET) {
+      return NextResponse.json(
+        { ok: false, error: "Chave inválida." },
         { status: 401, headers: corsHeaders(origin) }
       );
     }
 
-    if (!email || !newPassword) {
+    if (!userId || !newPassword || newPassword.length < 6) {
       return NextResponse.json(
-        { ok: false, error: "Informe email e newPassword." },
+        { ok: false, error: "Informe userId e uma senha com pelo menos 6 caracteres." },
         { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    const { data: usersData, error: listErr } =
-      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    if (listErr) {
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: newPassword,
+    });
+
+    if (error) {
       return NextResponse.json(
-        { ok: false, error: `Falha listUsers: ${listErr.message}` },
-        { status: 500, headers: corsHeaders(origin) }
-      );
-    }
-
-    const user = (usersData?.users || []).find(
-      (u) => (u.email || "").toLowerCase() === email
-    );
-
-    if (!user) {
-      return NextResponse.json(
-        { ok: false, error: "Usuário não encontrado no Supabase Auth." },
-        { status: 404, headers: corsHeaders(origin) }
-      );
-    }
-
-    const { data: updated, error: updErr } =
-      await supabaseAdmin.auth.admin.updateUserById(user.id, {
-        password: newPassword,
-        email_confirm: true,
-      });
-
-    if (updErr) {
-      return NextResponse.json(
-        { ok: false, error: `Falha updateUserById: ${updErr.message}` },
-        { status: 500, headers: corsHeaders(origin) }
+        { ok: false, error: error.message },
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     return NextResponse.json(
-      {
-        ok: true,
-        user_id: updated.user.id,
-        email: updated.user.email,
-        message: "Senha redefinida com sucesso.",
-      },
+      { ok: true },
       { status: 200, headers: corsHeaders(origin) }
     );
   } catch (e: any) {

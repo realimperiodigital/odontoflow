@@ -1,88 +1,86 @@
-// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const msg = searchParams.get("msg");
+  const [error, setError] = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
-    try {
-      const { error } = await supabaseBrowser.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (error) {
-        router.replace(`/login?msg=${encodeURIComponent(error.message)}`);
-        return;
-      }
-
-      // Garantia extra: força o Next a revalidar a sessão
-      router.replace("/app");
-      router.refresh();
-    } finally {
+    if (error) {
+      setError("Email ou senha inválidos");
       setLoading(false);
+      return;
     }
+
+    router.push("/dashboard");
   }
 
   return (
-    <main className="min-h-screen bg-[#05060a] text-white flex items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6">
-        <h1 className="text-2xl font-semibold">Login</h1>
-        <p className="mt-1 text-sm text-white/60">Entre com seu usuário MASTER.</p>
+    <main className="min-h-screen flex items-center justify-center bg-[#05060a] text-white">
+      <form
+        onSubmit={handleLogin}
+        className="w-full max-w-sm bg-white/5 p-8 rounded-xl border border-white/10"
+      >
+        <h1 className="text-2xl font-semibold mb-6 text-center">
+          Entrar no OdontoFlow
+        </h1>
 
-        <form onSubmit={handleLogin} className="mt-6 space-y-4">
-          <div>
-            <label className="text-sm text-white/70">Email</label>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white outline-none"
-              placeholder="seu@email.com"
-              type="email"
-              required
-            />
+        {error && (
+          <div className="mb-4 text-sm text-red-400 text-center">
+            {error}
           </div>
+        )}
 
-          <div>
-            <label className="text-sm text-white/70">Senha</label>
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white outline-none"
-              placeholder="Sua senha"
-              type="password"
-              required
-            />
-          </div>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="w-full mb-3 px-4 py-3 rounded-lg bg-black/40 border border-white/10 outline-none"
+        />
 
-          {msg ? (
-            <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/80">
-              {msg}
-            </div>
-          ) : null}
+        <input
+          type="password"
+          placeholder="Senha"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="w-full mb-4 px-4 py-3 rounded-lg bg-black/40 border border-white/10 outline-none"
+        />
 
-          <button
-            disabled={loading}
-            className="w-full rounded-xl bg-white text-black py-3 font-semibold disabled:opacity-60"
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-xl bg-white text-black px-4 py-3 font-semibold hover:bg-white/90 transition"
+        >
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="w-full mt-3 rounded-xl border border-white/20 px-4 py-3 text-sm hover:bg-white/5"
+        >
+          Voltar
+        </button>
+      </form>
     </main>
   );
 }
