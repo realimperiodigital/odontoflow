@@ -1,16 +1,12 @@
-// lib/supabase/browser.ts
 import { createBrowserClient } from "@supabase/ssr";
 
 export function createSupabaseBrowser() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !anon) {
-    throw new Error("Faltam NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY no .env.local");
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Supabase env vars missing on browser");
   }
 
-  return createBrowserClient(url, anon);
+  return createBrowserClient(supabaseUrl, supabaseKey);
 }
-
-// Compatibilidade com imports antigos
-export const supabaseBrowser = createSupabaseBrowser();
