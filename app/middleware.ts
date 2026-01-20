@@ -6,17 +6,13 @@ export async function middleware(req: NextRequest) {
   const url = req.nextUrl;
   const pathname = url.pathname;
 
-  // rotas públicas
+  // Rotas públicas
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/post-login") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon");
-
-  // IMPORTANTE: /master NÃO entra como pública,
-  // porque vamos permitir abrir /master deslogado,
-  // mas controlar o acesso dentro da própria página e aqui embaixo.
 
   if (isPublic) return NextResponse.next();
 
@@ -26,12 +22,19 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ✅ Caso especial: permitir abrir /master mesmo deslogado (pra fazer login lá)
-  if (!user && pathname.startsWith("/master")) {
+  // ✅ Deixa abrir /master SEM estar logado (pra mostrar o login master)
+  if (!user && pathname === "/master") {
     return NextResponse.next();
   }
 
-  // Se não estiver logado em qualquer outra rota protegida, manda pro login
+  // ✅ Qualquer /master/* (tipo /master/painel) exige login
+  if (!user && pathname.startsWith("/master/")) {
+    const to = url.clone();
+    to.pathname = "/master";
+    return NextResponse.redirect(to);
+  }
+
+  // Outras rotas protegidas (se tiver) sem login -> /login
   if (!user) {
     const to = url.clone();
     to.pathname = "/login";
@@ -47,13 +50,15 @@ export async function middleware(req: NextRequest) {
 
   const role = profile?.role ?? "user";
 
-  // Protege /master: só master entra
-  if (pathname.startsWith("/master") && role !== "master") {
+  // Protege /master/*: só master entra
+  if (pathname.startsWith("/master/") && role !== "master") {
     const to = url.clone();
     to.pathname = "/";
     return NextResponse.redirect(to);
   }
 
+  // Se tentar acessar /master (login) estando logado, ainda pode.
+  // (mas o /master vai deslogar de qualquer forma, porque você quer senha sempre)
   return NextResponse.next();
 }
 
