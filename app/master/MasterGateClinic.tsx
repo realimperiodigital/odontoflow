@@ -14,10 +14,10 @@ export default function MasterGateClient() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // ✅ Regra do Master: SEMPRE pedir senha
+  // ✅ SEMPRE pedir senha no /master
   useEffect(() => {
     (async () => {
-      await supabase.auth.signOut(); // força deslogar sempre que abrir /master
+      await supabase.auth.signOut();
       setReady(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,7 +39,6 @@ export default function MasterGateClient() {
       return;
     }
 
-    // ✅ Confere se é master de verdade
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
