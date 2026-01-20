@@ -3,28 +3,28 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-// ⚠️ Cole aqui o UUID do seu usuário master (auth.users.id)
-const MASTER_USER_ID = "44d72a7c-44c4-4d5b-a012-75c29d913c1c";
+// ⚠️ UUID do seu usuário master (auth.users.id)
+const MASTER_USER_ID: string = "44d72a7c-44c4-4d5b-a012-75c29d913c1c";
 
 // Senha provisória do admin da clínica
 const TEMP_PASSWORD = "odontoflow123";
 
-function badRequest(message: string) {
-  return NextResponse.json({ ok: false, error: message }, { status: 400 });
+function jsonError(status: number, message: string, where?: string) {
+  return NextResponse.json(
+    { ok: false, error: message, ...(where ? { where } : {}) },
+    { status }
+  );
 }
 
 export async function OPTIONS() {
-  // ajuda com preflight (às vezes evita dor de cabeça)
   return new NextResponse(null, { status: 204 });
 }
 
 export async function POST(req: Request) {
   try {
-    if (!MASTER_USER_ID || MASTER_USER_ID === "COLE_O_UUID_DO_MASTER_AQUI") {
-      return NextResponse.json(
-        { ok: false, error: "MASTER_USER_ID não configurado." },
-        { status: 500 }
-      );
+    // validação simples (sem comparar com string fixa, pra não quebrar no build)
+    if (!MASTER_USER_ID || MASTER_USER_ID.trim().length < 10) {
+      return jsonError(500, "MASTER_USER_ID não configurado.", "config");
     }
 
     const supabaseAdmin = getSupabaseAdmin();
@@ -44,16 +44,16 @@ export async function POST(req: Request) {
       admin_email,
     } = body || {};
 
-    // validações básicas
-    if (!nome_fantasia) return badRequest("Nome fantasia é obrigatório");
-    if (!cnpj) return badRequest("CNPJ é obrigatório");
-    if (!telefone_clinica) return badRequest("Telefone da clínica é obrigatório");
-    if (!email_clinica) return badRequest("E-mail da clínica é obrigatório");
+    // validações
+    if (!nome_fantasia) return jsonError(400, "Nome fantasia é obrigatório");
+    if (!cnpj) return jsonError(400, "CNPJ é obrigatório");
+    if (!telefone_clinica) return jsonError(400, "Telefone da clínica é obrigatório");
+    if (!email_clinica) return jsonError(400, "E-mail da clínica é obrigatório");
 
-    if (!admin_nome) return badRequest("Admin responsável é obrigatório");
-    if (!admin_cargo) return badRequest("Cargo do admin é obrigatório");
-    if (!admin_telefone) return badRequest("Telefone do admin é obrigatório");
-    if (!admin_email) return badRequest("E-mail do admin é obrigatório");
+    if (!admin_nome) return jsonError(400, "Admin responsável é obrigatório");
+    if (!admin_cargo) return jsonError(400, "Cargo do admin é obrigatório");
+    if (!admin_telefone) return jsonError(400, "Telefone do admin é obrigatório");
+    if (!admin_email) return jsonError(400, "E-mail do admin é obrigatório");
 
     // 1) cria clínica
     const { data: clinic, error: clinicErr } = await supabaseAdmin
@@ -62,25 +62,22 @@ export async function POST(req: Request) {
         name: String(nome_fantasia).trim(),
         cnpj: String(cnpj).trim(),
         phone: String(telefone_clinica).trim(),
-        email: String(email_clinica).trim(),
+        email: String(email_clinica).trim().toLowerCase(),
         is_headquarters: true,
         parent_clinic_id: null,
         owner_id: MASTER_USER_ID,
-        // 👇 OBS: só vai funcionar se você tiver a coluna.
-        // se não tiver, comente a linha de baixo.
+
+        // Se você criou a coluna "observacoes" em clinics, descomenta:
         // observacoes: String(observacoes || "").trim(),
       })
       .select("*")
       .single();
 
-    if (clinicErr) {
-      return NextResponse.json(
-        { ok: false, error: clinicErr.message, where: "insert clinics" },
-        { status: 500 }
-      );
+    if (clinicErr || !clinic) {
+      return jsonError(500, clinicErr?.message || "Falha ao criar clínica", "insert clinics");
     }
 
-    // 2) cria usuário no Auth (admin da clínica)
+    // 2) cria usuário admin no Auth
     const { data: created, error: createUserErr } =
       await supabaseAdmin.auth.admin.createUser({
         email: String(admin_email).trim().toLowerCase(),
@@ -92,27 +89,23 @@ export async function POST(req: Request) {
           phone: String(admin_telefone).trim(),
           clinic_id: clinic.id,
           role: "clinic_admin",
+          observacoes: String(observacoes || "").trim(),
         },
       });
 
     if (createUserErr || !created?.user) {
-      // rollback simples: apaga a clínica se falhar o usuário
+      // rollback: apaga clínica
       await supabaseAdmin.from("clinics").delete().eq("id", clinic.id);
-
-      return NextResponse.json(
-        {
-          ok: false,
-          error: createUserErr?.message || "Falha ao criar usuário admin",
-          where: "create auth user",
-        },
-        { status: 500 }
+      return jsonError(
+        500,
+        createUserErr?.message || "Falha ao criar usuário admin",
+        "create auth user"
       );
     }
 
     const adminUserId = created.user.id;
 
-    // 3) vincula usuário à clínica (tabela clinic_users)
-    // ⚠️ ajuste nomes de colunas se o seu schema for diferente
+    // 3) vincula na clinic_users
     const { error: linkErr } = await supabaseAdmin.from("clinic_users").insert({
       clinic_id: clinic.id,
       user_id: adminUserId,
@@ -125,14 +118,11 @@ export async function POST(req: Request) {
     });
 
     if (linkErr) {
-      // rollback: apaga usuário criado e clínica
+      // rollback: apaga usuário e clínica
       await supabaseAdmin.auth.admin.deleteUser(adminUserId);
       await supabaseAdmin.from("clinics").delete().eq("id", clinic.id);
 
-      return NextResponse.json(
-        { ok: false, error: linkErr.message, where: "insert clinic_users" },
-        { status: 500 }
-      );
+      return jsonError(500, linkErr.message, "insert clinic_users");
     }
 
     return NextResponse.json(
@@ -143,18 +133,15 @@ export async function POST(req: Request) {
           id: adminUserId,
           nome: admin_nome,
           email: admin_email,
-          senha_provisoria: TEMP_PASSWORD,
           cargo: admin_cargo,
           telefone: admin_telefone,
+          senha_provisoria: TEMP_PASSWORD,
           observacoes: observacoes || "",
         },
       },
       { status: 201 }
     );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Erro inesperado" },
-      { status: 500 }
-    );
+    return jsonError(500, err?.message || "Erro inesperado", "catch");
   }
 }
