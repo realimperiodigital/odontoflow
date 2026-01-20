@@ -1,11 +1,12 @@
-// app/api/master/clinics/route.ts
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+
     const { name, email, phone } = await req.json();
 
     if (!name || !email) {
@@ -15,7 +16,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verifica duplicidade
     const { data: exists } = await supabaseAdmin
       .from("clinics")
       .select("id")
@@ -29,7 +29,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Insere clínica
     const { data, error } = await supabaseAdmin
       .from("clinics")
       .insert([
