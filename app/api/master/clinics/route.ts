@@ -3,14 +3,26 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-// 4d472a7c-44c4-4d5b-a012-75c29d913c1c (auth.users.id do masterodontoflow@gmail.com)
+// UUID do usuário master (auth.users.id do masterodontoflow@gmail.com)
 const MASTER_USER_ID = "4d472a7c-44c4-4d5b-a012-75c29d913c1c";
 
 export async function POST(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
 
-    const { name, email, phone } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json(
+        { ok: false, error: "Body inválido (JSON)" },
+        { status: 400 }
+      );
+    }
+
+    const { name, email, phone } = body as {
+      name?: string;
+      email?: string;
+      phone?: string;
+    };
 
     if (!name || !email) {
       return NextResponse.json(
@@ -19,26 +31,35 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!MASTER_USER_ID || MASTER_USER_ID === "COLE_O_UUID_DO_MASTER_AQUI") {
+    if (!MASTER_USER_ID) {
       return NextResponse.json(
         { ok: false, error: "MASTER_USER_ID não configurado." },
         { status: 500 }
       );
     }
 
-    const { data: exists } = await supabaseAdmin
+    // Impede duplicar clínica por email
+    const { data: exists, error: existsError } = await supabaseAdmin
       .from("clinics")
       .select("id")
       .eq("email", email)
       .maybeSingle();
 
+    if (existsError) {
+      return NextResponse.json(
+        { ok: false, error: existsError.message },
+        { status: 500 }
+      );
+    }
+
     if (exists) {
       return NextResponse.json(
-        { ok: false, error: "Clínica já cadastrada" },
+        { ok: false, error: "Clínica já cadastrada com esse e-mail" },
         { status: 409 }
       );
     }
 
+    // Cria a clínica
     const { data, error } = await supabaseAdmin
       .from("clinics")
       .insert([
@@ -63,7 +84,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, clinic: data }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err.message || "Erro inesperado" },
+      { ok: false, error: err?.message || "Erro inesperado" },
       { status: 500 }
     );
   }
