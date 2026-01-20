@@ -3,6 +3,9 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
+// 4d472a7c-44c4-4d5b-a012-75c29d913c1c (auth.users.id do masterodontoflow@gmail.com)
+const MASTER_USER_ID = "4d472a7c-44c4-4d5b-a012-75c29d913c1c";
+
 export async function POST(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -13,6 +16,13 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { ok: false, error: "Nome e e-mail são obrigatórios" },
         { status: 400 }
+      );
+    }
+
+    if (!MASTER_USER_ID || MASTER_USER_ID === "COLE_O_UUID_DO_MASTER_AQUI") {
+      return NextResponse.json(
+        { ok: false, error: "MASTER_USER_ID não configurado." },
+        { status: 500 }
       );
     }
 
@@ -37,6 +47,7 @@ export async function POST(req: Request) {
           email,
           phone: phone || null,
           status: "active",
+          owner_id: MASTER_USER_ID,
         },
       ])
       .select()
