@@ -1,50 +1,62 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createSupabaseServer } from "./lib/supabase/server";
 
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+export async function middleware(req: NextRequest) {
+  const url = req.nextUrl;
+  const pathname = url.pathname;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
+  // rotas públicas
+  const isPublic =
+    pathname === "/" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/post-login") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon");
+
+  // IMPORTANTE: /master NÃO entra como pública,
+  // porque vamos permitir abrir /master deslogado,
+  // mas controlar o acesso dentro da própria página e aqui embaixo.
+
+  if (isPublic) return NextResponse.next();
+
+  const supabase = await createSupabaseServer();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-
-  // Se tentar entrar em /app sem login -> manda pro /login
-  if (path.startsWith("/app") && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+  // ✅ Caso especial: permitir abrir /master mesmo deslogado (pra fazer login lá)
+  if (!user && pathname.startsWith("/master")) {
+    return NextResponse.next();
   }
 
-  // Se já estiver logado e entrar em /login -> manda pro /app
-  if (path === "/login" && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/app";
-    return NextResponse.redirect(url);
+  // Se não estiver logado em qualquer outra rota protegida, manda pro login
+  if (!user) {
+    const to = url.clone();
+    to.pathname = "/login";
+    return NextResponse.redirect(to);
   }
 
-  return response;
+  // Se estiver logado, pega role
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const role = profile?.role ?? "user";
+
+  // Protege /master: só master entra
+  if (pathname.startsWith("/master") && role !== "master") {
+    const to = url.clone();
+    to.pathname = "/";
+    return NextResponse.redirect(to);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/login"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
