@@ -1,64 +1,31 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createSupabaseServer } from "./lib/supabase/server";
 
-export async function middleware(req: NextRequest) {
-  const url = req.nextUrl;
-  const pathname = url.pathname;
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-  // Rotas públicas
-  const isPublic =
+  // Libera tudo que é público
+  if (
     pathname === "/" ||
     pathname.startsWith("/login") ||
-    pathname.startsWith("/post-login") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon");
-
-  if (isPublic) return NextResponse.next();
-
-  const supabase = await createSupabaseServer();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // ✅ Deixa abrir /master SEM estar logado (pra mostrar o login master)
-  if (!user && pathname === "/master") {
+    pathname.startsWith("/favicon.ico")
+  ) {
     return NextResponse.next();
   }
 
-  // ✅ Qualquer /master/* (tipo /master/painel) exige login
-  if (!user && pathname.startsWith("/master/")) {
-    const to = url.clone();
-    to.pathname = "/master";
-    return NextResponse.redirect(to);
+  // ✅ Regra do Master:
+  // /master pode abrir (porque vai mostrar o login master)
+  if (pathname === "/master") return NextResponse.next();
+
+  // /master/painel não pode abrir sem antes passar pelo /master (login)
+  if (pathname.startsWith("/master/")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/master";
+    return NextResponse.redirect(url);
   }
 
-  // Outras rotas protegidas (se tiver) sem login -> /login
-  if (!user) {
-    const to = url.clone();
-    to.pathname = "/login";
-    return NextResponse.redirect(to);
-  }
-
-  // Se estiver logado, pega role
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const role = profile?.role ?? "user";
-
-  // Protege /master/*: só master entra
-  if (pathname.startsWith("/master/") && role !== "master") {
-    const to = url.clone();
-    to.pathname = "/";
-    return NextResponse.redirect(to);
-  }
-
-  // Se tentar acessar /master (login) estando logado, ainda pode.
-  // (mas o /master vai deslogar de qualquer forma, porque você quer senha sempre)
+  // Outras rotas: deixa passar por enquanto
   return NextResponse.next();
 }
 
