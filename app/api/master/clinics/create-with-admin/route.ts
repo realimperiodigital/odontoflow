@@ -1,3 +1,5 @@
+// app/api/master/clinics/create-with-admin/route.ts
+
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -6,13 +8,13 @@ export const runtime = "nodejs";
 type Body = {
   clinic_name: string;
   clinic_email: string;
-  admin_name?: string;
+  admin_name: string;
   admin_email: string;
   admin_password: string;
 };
 
-function badRequest(message: string) {
-  return NextResponse.json({ ok: false, error: message }, { status: 400 });
+function cleanStr(v: unknown) {
+  return String(v ?? "").trim();
 }
 
 export async function POST(req: Request) {
@@ -21,84 +23,94 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as Partial<Body>;
 
-    const clinic_name = (body.clinic_name ?? "").trim();
-    const clinic_email = (body.clinic_email ?? "").trim().toLowerCase();
-    const admin_name = (body.admin_name ?? "").trim();
-    const admin_email = (body.admin_email ?? "").trim().toLowerCase();
-    const admin_password = (body.admin_password ?? "").trim();
+    const clinic_name = cleanStr(body.clinic_name);
+    const clinic_email = cleanStr(body.clinic_email).toLowerCase();
+    const admin_name = cleanStr(body.admin_name);
+    const admin_email = cleanStr(body.admin_email).toLowerCase();
+    const admin_password = cleanStr(body.admin_password);
 
-    if (!clinic_name) return badRequest("Informe o nome da clínica.");
-    if (!clinic_email) return badRequest("Informe o e-mail da clínica.");
-    if (!admin_email) return badRequest("Informe o e-mail do admin.");
-    if (!admin_password) return badRequest("Informe a senha do admin.");
+    if (!clinic_name || !clinic_email || !admin_name || !admin_email || !admin_password) {
+      return NextResponse.json(
+        { ok: false, error: "Campos obrigatórios faltando." },
+        { status: 400 }
+      );
+    }
 
-    // 1) cria a clínica
-    const { data: clinic, error: clinicErr } = await supabaseAdmin
+    // 1) Cria a clínica
+    const { data: clinicRow, error: clinicErr } = await supabaseAdmin
       .from("clinics")
-      .insert({ name: clinic_name, email: clinic_email })
+      .insert({ name: clinic_name, email: clinic_email } as any)
       .select("*")
       .single();
 
     if (clinicErr) {
       return NextResponse.json(
-        { ok: false, error: clinicErr.message },
+        { ok: false, error: `Erro criando clínica: ${clinicErr.message}` },
+        { status: 400 }
+      );
+    }
+
+    const clinicId = String((clinicRow as any)?.id ?? "");
+    if (!clinicId) {
+      return NextResponse.json(
+        { ok: false, error: "Clínica criada, mas não retornou ID." },
         { status: 500 }
       );
     }
 
-    // 2) cria usuário admin no Auth
+    // 2) Cria o usuário admin (Auth)
     const created = await supabaseAdmin.auth.admin.createUser({
       email: admin_email,
       password: admin_password,
       email_confirm: true,
       user_metadata: {
-        name: admin_name || "Admin",
+        full_name: admin_name,
+        clinic_id: clinicId,
         role: "clinic_admin",
-        clinic_id: clinic.id,
-      },
+      } as any,
     });
 
-    // Se já existe usuário, cria um erro aqui; então buscamos pelo listUsers (blindado)
-    let userId: string | null = created.data.user?.id ?? null;
-
-    if (created.error || !userId) {
-      const listed = await supabaseAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 200,
-      });
-
-      const users = ((listed.data as any)?.users ?? []) as any[];
-      const found = users.find(
-        (u) => (u?.email ?? "").toLowerCase() === admin_email.toLowerCase()
+    if (created.error) {
+      return NextResponse.json(
+        { ok: false, error: `Erro criando admin da clínica: ${created.error.message}` },
+        { status: 400 }
       );
-
-      userId = found?.id ?? null;
-
-      if (!userId) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `Erro criando admin: ${
-              created.error?.message ?? "usuário não encontrado"
-            }`,
-          },
-          { status: 500 }
-        );
-      }
     }
 
-    // 3) garante profile (se existir essa tabela)
-    await supabaseAdmin.from("profiles").upsert({
-      id: userId,
-      full_name: admin_name || "Admin",
-      role: "clinic_admin",
-      clinic_id: clinic.id,
-    });
+    const userId = String((created.data as any)?.user?.id ?? "");
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, error: "Usuário criado, mas não retornou user.id." },
+        { status: 500 }
+      );
+    }
+
+    // 3) Garante/atualiza profile (se sua tabela profiles existir)
+    const { error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .upsert(
+        {
+          id: userId,
+          full_name: admin_name,
+          email: admin_email,
+          role: "clinic_admin",
+          clinic_id: clinicId,
+        } as any,
+        { onConflict: "id" } as any
+      );
+
+    if (profileErr) {
+      return NextResponse.json(
+        { ok: false, error: `Erro criando profile: ${profileErr.message}` },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
-      clinic,
+      clinic: clinicRow,
       admin_user_id: userId,
+      clinic_id: clinicId,
     });
   } catch (e: any) {
     return NextResponse.json(
