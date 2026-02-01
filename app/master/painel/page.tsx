@@ -1,5 +1,7 @@
+export const runtime = "nodejs";
+
 import { redirect } from "next/navigation";
-import { createSupabaseServer } from "../../../lib/supabase/server";
+import { createSupabaseServer } from "@/lib/supabase/server";
 
 export default async function MasterPainelPage() {
   const supabase = await createSupabaseServer();
@@ -8,27 +10,35 @@ export default async function MasterPainelPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Se alguém tentar entrar direto, volta pro /master (que vai pedir senha)
-  if (!user) redirect("/master");
+  if (!user) {
+    redirect("/master");
+  }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, email")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "master") redirect("/");
+  const { data: clinics } = await supabase
+    .from("clinics")
+    .select("*")
+    .order("created_at", { ascending: false });
 
   return (
-    <main style={{ padding: 40 }}>
+    <main style={{ padding: 24 }}>
       <h1>Painel Master</h1>
-      <p style={{ marginTop: 10 }}>
-        Logado como: <b>{profile?.email ?? user.email}</b>
-      </p>
+      <p>Logado como: {user.email}</p>
 
-      <p style={{ marginTop: 18 }}>
-        Aqui vamos colocar os formulários de criação de clínica e criação do usuário da clínica.
-      </p>
+      <hr style={{ margin: "16px 0" }} />
+
+      <a href="/master/nova-clinica">+ Nova Clínica</a>
+
+      <div style={{ marginTop: 24 }}>
+        {!clinics || clinics.length === 0 ? (
+          <p>Nenhuma clínica cadastrada.</p>
+        ) : (
+          clinics.map((c) => (
+            <div key={c.id}>
+              <strong>{c.name}</strong> – {c.email}
+            </div>
+          ))
+        )}
+      </div>
     </main>
   );
 }
