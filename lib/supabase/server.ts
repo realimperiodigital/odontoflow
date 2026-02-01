@@ -1,17 +1,18 @@
-import { cookies } from "next/headers";
+// lib/supabase/server.ts
 import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 export async function createSupabaseServer() {
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseKey) {
+  if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Supabase env vars missing on server");
   }
 
-  return createServerClient(supabaseUrl, supabaseKey, {
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;
@@ -20,7 +21,7 @@ export async function createSupabaseServer() {
         cookieStore.set({ name, value, ...options });
       },
       remove(name: string, options: any) {
-        cookieStore.set({ name, value: "", ...options, maxAge: 0 });
+        cookieStore.set({ name, value: "", ...options });
       },
     },
   });
