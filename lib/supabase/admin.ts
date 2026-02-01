@@ -1,17 +1,21 @@
 // lib/supabase/admin.ts
 import { createClient } from "@supabase/supabase-js";
+import { ENV } from "@/lib/env";
+
+let _admin: ReturnType<typeof createClient> | null = null;
 
 export function getSupabaseAdmin() {
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  if (_admin) return _admin;
 
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Supabase admin env vars ausentes");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false },
+  _admin = createClient(ENV.SUPABASE_URL(), ENV.SUPABASE_SERVICE(), {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   });
+
+  return _admin;
 }
+
+export const supabaseAdmin = getSupabaseAdmin();

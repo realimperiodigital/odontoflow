@@ -1,12 +1,13 @@
-import { createBrowserClient } from "@supabase/ssr";
+// lib/supabase/browser.ts
+import { createClient } from "@supabase/supabase-js";
+import { ENV } from "@/lib/env";
 
 export function createSupabaseBrowser() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase env vars missing on browser");
-  }
-
-  return createBrowserClient(supabaseUrl, supabaseKey);
+  return createClient(ENV.SUPABASE_URL(), ENV.SUPABASE_ANON(), {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
 }
