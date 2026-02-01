@@ -1,45 +1,49 @@
 // app/api/master/clinics/create-with-admin/route.ts
-
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "../../../../../lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 type Body = {
   clinic_name: string;
   clinic_email: string;
-  admin_name: string;
+  admin_name?: string;
   admin_email: string;
   admin_password: string;
 };
 
-function cleanStr(v: unknown) {
-  return String(v ?? "").trim();
-}
-
 export async function POST(req: Request) {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
-
     const body = (await req.json()) as Partial<Body>;
 
-    const clinic_name = cleanStr(body.clinic_name);
-    const clinic_email = cleanStr(body.clinic_email).toLowerCase();
-    const admin_name = cleanStr(body.admin_name);
-    const admin_email = cleanStr(body.admin_email).toLowerCase();
-    const admin_password = cleanStr(body.admin_password);
+    const clinic_name = (body.clinic_name || "").trim();
+    const clinic_email = (body.clinic_email || "").trim().toLowerCase();
+    const admin_name = (body.admin_name || "").trim();
+    const admin_email = (body.admin_email || "").trim().toLowerCase();
+    const admin_password = (body.admin_password || "").trim();
 
-    if (!clinic_name || !clinic_email || !admin_name || !admin_email || !admin_password) {
+    if (!clinic_email) {
+      return NextResponse.json({ ok: false, error: "clinic_email é obrigatório" }, { status: 400 });
+    }
+    if (!admin_email) {
+      return NextResponse.json({ ok: false, error: "admin_email é obrigatório" }, { status: 400 });
+    }
+    if (!admin_password || admin_password.length < 6) {
       return NextResponse.json(
-        { ok: false, error: "Campos obrigatórios faltando." },
+        { ok: false, error: "admin_password precisa ter pelo menos 6 caracteres" },
         { status: 400 }
       );
     }
 
-    // 1) Cria a clínica
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // 1) cria clínica (garante que a coluna clinics.name exista no banco)
     const { data: clinicRow, error: clinicErr } = await supabaseAdmin
       .from("clinics")
-      .insert({ name: clinic_name, email: clinic_email } as any)
+      .insert({
+        name: clinic_name || clinic_email,
+        email: clinic_email,
+      })
       .select("*")
       .single();
 
@@ -50,58 +54,53 @@ export async function POST(req: Request) {
       );
     }
 
-    const clinicId = String((clinicRow as any)?.id ?? "");
-    if (!clinicId) {
-      return NextResponse.json(
-        { ok: false, error: "Clínica criada, mas não retornou ID." },
-        { status: 500 }
-      );
-    }
+    const clinicId = clinicRow.id;
 
-    // 2) Cria o usuário admin (Auth)
-    const created = await supabaseAdmin.auth.admin.createUser({
+    // 2) cria usuário no Auth (ADMIN)
+    const createRes: any = await supabaseAdmin.auth.admin.createUser({
       email: admin_email,
       password: admin_password,
       email_confirm: true,
       user_metadata: {
-        full_name: admin_name,
+        full_name: admin_name || null,
         clinic_id: clinicId,
         role: "clinic_admin",
-      } as any,
+      },
     });
 
-    if (created.error) {
+    if (createRes?.error) {
+      // se der erro, remove a clínica criada pra não ficar sujeira
+      await supabaseAdmin.from("clinics").delete().eq("id", clinicId);
       return NextResponse.json(
-        { ok: false, error: `Erro criando admin da clínica: ${created.error.message}` },
+        { ok: false, error: `Erro criando usuário admin: ${createRes.error.message}` },
         { status: 400 }
       );
     }
 
-    const userId = String((created.data as any)?.user?.id ?? "");
+    const userId: string | undefined = createRes?.data?.user?.id;
+
     if (!userId) {
+      await supabaseAdmin.from("clinics").delete().eq("id", clinicId);
       return NextResponse.json(
-        { ok: false, error: "Usuário criado, mas não retornou user.id." },
-        { status: 500 }
+        { ok: false, error: "Usuário admin não retornou id" },
+        { status: 400 }
       );
     }
 
-    // 3) Garante/atualiza profile (se sua tabela profiles existir)
-    const { error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .upsert(
-        {
-          id: userId,
-          full_name: admin_name,
-          email: admin_email,
-          role: "clinic_admin",
-          clinic_id: clinicId,
-        } as any,
-        { onConflict: "id" } as any
-      );
+    // 3) garante profile do admin
+    const { error: profileErr } = await supabaseAdmin.from("profiles").upsert(
+      {
+        id: userId,
+        role: "clinic_admin",
+        clinic_id: clinicId,
+        full_name: admin_name || null,
+      },
+      { onConflict: "id" }
+    );
 
     if (profileErr) {
       return NextResponse.json(
-        { ok: false, error: `Erro criando profile: ${profileErr.message}` },
+        { ok: false, error: `Clínica criada, mas falhou ao criar profile: ${profileErr.message}` },
         { status: 400 }
       );
     }

@@ -1,5 +1,4 @@
 // lib/supabase/database/types.ts
-
 export type Json =
   | string
   | number
@@ -8,31 +7,60 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-type AnyTable = {
-  Row: any;
-  Insert: any;
-  Update: any;
-  Relationships: any[];
-};
-
 export type Database = {
   public: {
     Tables: {
-      // ✅ Isso aqui é o "cura geral":
-      // permite usar from("profiles"), from("clinics") etc sem virar "never"
-      [key: string]: AnyTable;
+      clinics: {
+        Row: {
+          id: string;
+          name: string | null;
+          email: string;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          name?: string | null;
+          email: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string | null;
+          email?: string;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      profiles: {
+        Row: {
+          id: string;
+          role: string | null;
+          clinic_id: string | null;
+          full_name: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id: string;
+          role?: string | null;
+          clinic_id?: string | null;
+          full_name?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          role?: string | null;
+          clinic_id?: string | null;
+          full_name?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
-    Views: {
-      [key: string]: never;
-    };
-    Functions: {
-      [key: string]: never;
-    };
-    Enums: {
-      [key: string]: string;
-    };
-    CompositeTypes: {
-      [key: string]: never;
-    };
+
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, string>;
+    CompositeTypes: Record<string, never>;
   };
 };

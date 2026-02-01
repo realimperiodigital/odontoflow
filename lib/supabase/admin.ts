@@ -4,7 +4,7 @@ import type { Database } from "./database/types";
 
 function getEnv(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
+  if (!v) throw new Error(`Faltando variável de ambiente: ${name}`);
   return v;
 }
 
@@ -20,11 +20,12 @@ export function getSupabaseAdmin() {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+      detectSessionInUrl: false,
     },
   });
 
   return _admin;
 }
 
-// ✅ export que o seu route.ts está tentando usar
+// Mantém compatível com seus imports atuais
 export const supabaseAdmin = getSupabaseAdmin();
