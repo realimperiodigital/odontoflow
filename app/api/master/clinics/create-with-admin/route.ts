@@ -1,133 +1,90 @@
-// app/api/master/clinics/create-with-admin/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { User } from "@supabase/supabase-js";
-
-export const runtime = "nodejs";
-
-type Body = {
-  clinic_name: string;
-  clinic_email: string;
-  admin_email: string;
-  admin_password: string;
-};
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as Partial<Body>;
+    const body = await req.json();
 
-    const clinic_name = (body.clinic_name || "").trim();
-    const clinic_email = (body.clinic_email || "").trim().toLowerCase();
-    const admin_email = (body.admin_email || "").trim().toLowerCase();
-    const admin_password = (body.admin_password || "").trim();
+    const {
+      clinic_name,
+      clinic_email,
+      admin_name,
+      admin_email,
+      admin_password,
+    } = body;
 
     if (!clinic_name || !clinic_email || !admin_email || !admin_password) {
       return NextResponse.json(
-        { ok: false, error: "Campos obrigatórios faltando." },
+        { ok: false, error: "Dados obrigatórios ausentes" },
         { status: 400 }
       );
     }
 
-    // 1) Cria a clínica
-    const { data: clinic, error: clinicErr } = await supabaseAdmin
+    // 1. Cria a clínica
+    const { data: clinic, error: clinicError } = await supabaseAdmin
       .from("clinics")
       .insert({
         name: clinic_name,
         email: clinic_email,
-        status: "active",
       })
-      .select("*")
+      .select()
       .single();
 
-    if (clinicErr || !clinic) {
+    if (clinicError) {
       return NextResponse.json(
-        { ok: false, error: clinicErr?.message || "Erro criando clínica." },
-        { status: 500 }
+        { ok: false, error: clinicError.message },
+        { status: 400 }
       );
     }
 
-    // 2) Cria o usuário admin (Auth)
-    const created = await supabaseAdmin.auth.admin.createUser({
-      email: admin_email,
-      password: admin_password,
-      email_confirm: true,
-    });
+    // 2. Cria o usuário admin da clínica
+    const { data: createdUser, error: createUserError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email: admin_email,
+        password: admin_password,
+        email_confirm: true,
+        user_metadata: {
+          name: admin_name,
+          role: "clinic_admin",
+          clinic_id: clinic.id,
+        },
+      });
 
-    // Se criou com sucesso
-    if (created.data?.user?.id) {
-      const userId = created.data.user.id;
+    if (createUserError || !createdUser.user) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: createUserError?.message || "Erro ao criar usuário",
+        },
+        { status: 400 }
+      );
+    }
 
-      // 3) Garante profile ligado à clínica
-      await supabaseAdmin.from("profiles").upsert({
-        id: userId,
+    // 3. Cria profile do admin
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .insert({
+        id: createdUser.user.id,
         email: admin_email,
         role: "clinic_admin",
         clinic_id: clinic.id,
       });
 
-      return NextResponse.json({
-        ok: true,
-        clinic,
-        admin_user_id: userId,
-      });
-    }
-
-    // 4) Se deu erro porque já existe, tenta localizar o usuário existente
-    // (Aqui estava quebrando o build)
-    const listed = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 200,
-    });
-
-    if (listed.error) {
+    if (profileError) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Erro criando admin da clínica: " +
-            (created.error?.message || "desconhecido") +
-            " | E não consegui listar usuários: " +
-            listed.error.message,
-        },
-        { status: 500 }
+        { ok: false, error: profileError.message },
+        { status: 400 }
       );
     }
-
-    const users: User[] = (listed.data?.users as User[]) || [];
-    const found = users.find(
-      (u) => (u.email ?? "").toLowerCase() === admin_email
-    );
-
-    if (!found?.id) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Erro criando admin da clínica: " +
-            (created.error?.message || "desconhecido") +
-            " | Não encontrei o usuário existente pelo email.",
-        },
-        { status: 500 }
-      );
-    }
-
-    // 5) Atualiza/garante profile do usuário existente
-    await supabaseAdmin.from("profiles").upsert({
-      id: found.id,
-      email: admin_email,
-      role: "clinic_admin",
-      clinic_id: clinic.id,
-    });
 
     return NextResponse.json({
       ok: true,
       clinic,
-      admin_user_id: found.id,
-      note: "Usuário já existia, só vinculamos à clínica.",
+      admin_id: createdUser.user.id,
     });
-  } catch (e: any) {
+  } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: e?.message || "Erro inesperado." },
+      { ok: false, error: err.message || "Erro interno" },
       { status: 500 }
     );
   }
