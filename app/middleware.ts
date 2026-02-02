@@ -1,85 +1,97 @@
-"use client";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createSupabaseBrowser } from "@/lib/supabase/browser";
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
 
-export default function LoginPage() {
-  const router = useRouter();
-  const supabase = createSupabaseBrowser();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      setMsg(error.message);
-      return;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options);
+          });
+        },
+      },
     }
+  );
 
-    // middleware vai redirecionar pra /app automaticamente
-    router.refresh();
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
+
+  const path = req.nextUrl.pathname;
+
+  // libera arquivos estáticos
+  if (
+    path.startsWith("/_next") ||
+    path.startsWith("/favicon") ||
+    path.startsWith("/assets") ||
+    path.startsWith("/midia")
+  ) {
+    return res;
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow p-6">
-        <h1 className="text-xl font-semibold">Entrar na Clínica</h1>
-        <p className="text-sm text-zinc-600 mt-1">
-          Acesso para equipe da clínica
-        </p>
+  // rotas públicas do app
+  const isLogin = path === "/login";
+  const isMaster = path.startsWith("/master");
 
-        <form onSubmit={handleLogin} className="mt-6 space-y-3">
-          <input
-            className="w-full border rounded-xl px-3 py-2"
-            placeholder="E-mail"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          <input
-            className="w-full border rounded-xl px-3 py-2"
-            placeholder="Senha"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
+  // Se NÃO está logado:
+  if (!user) {
+    // deixa acessar /login e /master (porque são telas de login)
+    if (isLogin || isMaster) return res;
 
-          {msg ? (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-              {msg}
-            </div>
-          ) : null}
+    // qualquer outra rota -> /login
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
 
-          <button
-            disabled={loading}
-            className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+  // Está logado: buscar role
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
 
-        <div className="mt-4 text-sm text-zinc-600">
-          Funcionários OdontoFlow?{" "}
-          <a className="underline" href="/master">
-            Entrar como master
-          </a>
-        </div>
-      </div>
-    </div>
-  );
+  const role = profile?.role;
+
+  // Se não tem role, manda pro login (evita loop)
+  if (!role) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // /master só para master
+  if (isMaster && role !== "master") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // se for master e tentar entrar em /login, manda pra /master
+  if (isLogin && role === "master") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/master";
+    return NextResponse.redirect(url);
+  }
+
+  // se for clínica e estiver em /login, manda pra home do app
+  if (isLogin && role !== "master") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
+
+  return res;
 }
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
